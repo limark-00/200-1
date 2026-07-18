@@ -1,0 +1,31 @@
+# Pegasus PWM experiments: enable only one target at a time in the upper
+# app/BUILD.gn, for example: "pwm_demo:pwm_buz".
+# The Hi3861 SDK also requires CONFIG_PWM_SUPPORT=y in usr_config.mk.
+
+_pwm_includes = [
+  "//utils/native/lite/include",
+  "//kernel/liteos_m/components/cmsis/2.0",
+  "//base/iot_hardware/peripheral/interfaces/kits",
+  "//device/hisilicon/hispark_pegasus/sdk_liteos/include",
+  "//device/hisilicon/hispark_pegasus/hi3861_adapter/kal",
+]
+
+static_library("pwm_buz") {
+  sources = [ "pwm_buz.c" ]
+  include_dirs = _pwm_includes
+}
+
+static_library("pwm_params") {
+  sources = [ "pwm_params.c" ]
+  include_dirs = _pwm_includes
+}
+
+static_library("traffic_light") {
+  sources = [ "traffic_light.c" ]
+  include_dirs = _pwm_includes
+}
+
+static_library("pwm_led") {
+  sources = [ "pwm_led.c" ]
+  include_dirs = _pwm_includes
+}
