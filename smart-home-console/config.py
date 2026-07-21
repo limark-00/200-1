@@ -2,15 +2,11 @@
 """项目全局配置：巴法云 env004 真实设备。"""
 
 import os
-from pathlib import path
 
 # 建议通过环境变量设置：
 # Windows PowerShell：
 # $env:BEMFA_UID="你的巴法云私钥"
-BEMFA_UID = os.getenv("BEMFA_UID", "").strip()
-
-if not BEMFA_UID:
-    raise RuntimeError("请先设置环境变量 BEMFA_UID")
+BEMFA_UID = os.getenv("BEMFA_UID", "554419557d4567eb2f683d752c6aad23").strip()
 
 # 1=MQTT主题，3=TCP主题。env004若在MQTT设备云创建，保持1。
 BEMFA_TYPE = int(os.getenv("BEMFA_TYPE", "1"))
