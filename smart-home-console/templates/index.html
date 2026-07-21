@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>实验室环境安全监测平台</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family:
+        "Microsoft YaHei",
+        "PingFang SC",
+        Arial,
+        sans-serif;
+      color: #1b2b3c;
+      background: #f3f7fb;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 24px 36px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #173b61, #256da5);
+      box-shadow: 0 4px 16px rgba(24, 60, 95, 0.18);
+    }
+
+    .brand h1 {
+      margin-bottom: 8px;
+      font-size: 30px;
+      letter-spacing: 1px;
+    }
+
+    .brand p {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+    }
+
+    .cloud-state {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 170px;
+      padding: 12px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .state-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f4b942;
+      box-shadow: 0 0 12px rgba(244, 185, 66, 0.8);
+    }
+
+    .state-dot.online {
+      background: #55d68b;
+      box-shadow: 0 0 12px rgba(85, 214, 139, 0.9);
+    }
+
+    .state-dot.offline {
+      background: #ef6461;
+      box-shadow: 0 0 12px rgba(239, 100, 97, 0.9);
+    }
+
+    .container {
+      width: min(1200px, calc(100% - 40px));
+      margin: 30px auto 50px;
+    }
+
+    .overview {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 24px;
+      padding: 20px 24px;
+      border: 1px solid #dbe7f2;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(30, 65, 96, 0.08);
+    }
+
+    .overview h2 {
+      margin-bottom: 7px;
+      font-size: 23px;
+    }
+
+    .overview p {
+      color: #66798c;
+      font-size: 14px;
+    }
+
+    .refresh-button {
+      min-width: 112px;
+      padding: 11px 18px;
+      border: none;
+      border-radius: 9px;
+      color: #ffffff;
+      background: #276fa7;
+      font-size: 15px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .refresh-button:hover {
+      background: #1e5d8e;
+      transform: translateY(-1px);
+    }
+
+    .refresh-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 180px;
+      padding: 24px;
+      border: 1px solid #dce8f3;
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(30, 65, 96, 0.08);
+    }
+
+    .metric-card::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      content: "";
+      background: #3484bd;
+    }
+
+    .metric-card.warning::before {
+      background: #e6a23c;
+    }
+
+    .metric-card.danger::before {
+      background: #e35d5b;
+    }
+
+    .metric-name {
+      margin-bottom: 22px;
+      color: #66798c;
+      font-size: 17px;
+    }
+
+    .metric-value {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-height: 62px;
+      font-size: 50px;
+      font-weight: 700;
+      line-height: 1;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-unit {
+      color: #607488;
+      font-size: 20px;
+      font-weight: 400;
+    }
+
+    .metric-desc {
+      margin-top: 18px;
+      color: #8191a1;
+      font-size: 13px;
+    }
+
+    .panel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .panel {
+      padding: 24px;
+      border: 1px solid #dce8f3;
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(30, 65, 96, 0.08);
+    }
+
+    .panel h2 {
+      margin-bottom: 20px;
+      font-size: 21px;
+    }
+
+    .info-list {
+      display: grid;
+      gap: 16px;
+    }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 13px;
+      border-bottom: 1px solid #eef3f7;
+    }
+
+    .info-row:last-child {
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #6d8092;
+    }
+
+    .info-value {
+      max-width: 65%;
+      font-weight: 600;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 100px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      color: #2c7a50;
+      background: #e9f8f0;
+      font-weight: 700;
+    }
+
+    .risk-badge.warning {
+      color: #9a6413;
+      background: #fff4dd;
+    }
+
+    .risk-badge.danger {
+      color: #b33c39;
+      background: #fdebea;
+    }
+
+    .control-form {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .control-input {
+      flex: 1;
+      min-width: 0;
+      padding: 11px 13px;
+      border: 1px solid #cbd9e5;
+      border-radius: 9px;
+      outline: none;
+      font-size: 15px;
+    }
+
+    .control-input:focus {
+      border-color: #3484bd;
+      box-shadow: 0 0 0 3px rgba(52, 132, 189, 0.12);
+    }
+
+    .control-button {
+      padding: 11px 18px;
+      border: none;
+      border-radius: 9px;
+      color: #ffffff;
+      background: #276fa7;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .quick-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .quick-button {
+      padding: 9px 14px;
+      border: 1px solid #cbd9e5;
+      border-radius: 9px;
+      color: #29465f;
+      background: #f8fbfd;
+      cursor: pointer;
+    }
+
+    .quick-button:hover {
+      border-color: #3484bd;
+      background: #edf6fc;
+    }
+
+    .status-line {
+      min-height: 22px;
+      margin-top: 14px;
+      color: #617589;
+      font-size: 14px;
+    }
+
+    .raw-panel {
+      padding: 24px;
+      border: 1px solid #dce8f3;
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(30, 65, 96, 0.08);
+    }
+
+    .raw-panel summary {
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .raw-data {
+      max-height: 320px;
+      margin-top: 18px;
+      padding: 18px;
+      overflow: auto;
+      border-radius: 10px;
+      color: #dce9f3;
+      background: #172534;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 850px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .metric-grid,
+      .panel-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .overview {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar {
+        padding: 22px;
+      }
+
+      .container {
+        width: min(100% - 24px, 1200px);
+        margin-top: 18px;
+      }
+
+      .metric-value {
+        font-size: 40px;
+      }
+
+      .control-form {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>实验室环境安全监测平台</h1>
+      <p>Hi3861＋环境监测板＋巴法云＋FastAPI</p>
+    </div>
+
+    <div class="cloud-state">
+      <span id="stateDot" class="state-dot"></span>
+
+      <div>
+        <div id="cloudStateText">正在连接</div>
+        <small>巴法云主题：env004</small>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="overview">
+      <div>
+        <h2>设备实时数据</h2>
+        <p>
+          数据每5秒自动刷新，设备数据由Hi3861上传至巴法云。
+        </p>
+      </div>
+
+      <button
+        type="button"
+        id="refreshButton"
+        class="refresh-button"
+      >
+        立即刷新
+      </button>
+    </section>
+
+    <section class="metric-grid">
+      <article class="metric-card" id="temperatureCard">
+        <div class="metric-name">环境温度</div>
+
+        <div class="metric-value">
+          <span id="temperatureValue">--</span>
+          <span class="metric-unit">℃</span>
+        </div>
+
+        <div class="metric-desc">
+          AHT20温度传感器实时采集
+        </div>
+      </article>
+
+      <article class="metric-card" id="humidityCard">
+        <div class="metric-name">环境湿度</div>
+
+        <div class="metric-value">
+          <span id="humidityValue">--</span>
+          <span class="metric-unit">%</span>
+        </div>
+
+        <div class="metric-desc">
+          AHT20相对湿度实时采集
+        </div>
+      </article>
+
+      <article class="metric-card" id="gasCard">
+        <div class="metric-name">MQ-2气体值</div>
+
+        <div class="metric-value">
+          <span id="gasValue">--</span>
+        </div>
+
+        <div class="metric-desc">
+          烟雾及可燃气体传感器原始值
+        </div>
+      </article>
+    </section>
+
+    <section class="panel-grid">
+      <article class="panel">
+        <h2>设备信息</h2>
+
+        <div class="info-list">
+          <div class="info-row">
+            <span class="info-label">设备组</span>
+            <span id="groupIdValue" class="info-value">--</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">设备编号</span>
+            <span id="deviceIdValue" class="info-value">--</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">巴法云主题</span>
+            <span class="info-value">env004</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">消息时间</span>
+            <span id="messageTimeValue" class="info-value">--</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">更新时间</span>
+            <span id="refreshTimeValue" class="info-value">--</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>环境风险状态</h2>
+
+        <div class="info-list">
+          <div class="info-row">
+            <span class="info-label">当前等级</span>
+            <span id="riskBadge" class="risk-badge">正常</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">判断原因</span>
+            <span id="riskReason" class="info-value">
+              等待数据
+            </span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">连接状态</span>
+            <span id="connectionValue" class="info-value">
+              正在连接
+            </span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel-grid">
+      <article class="panel">
+        <h2>向设备发送消息</h2>
+
+        <div class="control-form">
+          <input
+            id="messageInput"
+            class="control-input"
+            type="text"
+            placeholder="输入消息，例如 alarm_on"
+          />
+
+          <button
+            type="button"
+            id="sendButton"
+            class="control-button"
+          >
+            发送
+          </button>
+        </div>
+
+        <div class="quick-buttons">
+          <button
+            type="button"
+            class="quick-button"
+            data-message="alarm_on"
+          >
+            开启报警
+          </button>
+
+          <button
+            type="button"
+            class="quick-button"
+            data-message="alarm_off"
+          >
+            关闭报警
+          </button>
+
+          <button
+            type="button"
+            class="quick-button"
+            data-message="pc_online"
+          >
+            PC在线测试
+          </button>
+        </div>
+
+        <p id="sendStatus" class="status-line"></p>
+      </article>
+
+      <article class="panel">
+        <h2>系统说明</h2>
+
+        <div class="info-list">
+          <div class="info-row">
+            <span class="info-label">数据来源</span>
+            <span class="info-value">
+              Hi3861环境监测板
+            </span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">通信平台</span>
+            <span class="info-value">
+              巴法云
+            </span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">后端框架</span>
+            <span class="info-value">
+              FastAPI
+            </span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">刷新周期</span>
+            <span class="info-value">
+              5秒
+            </span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <details class="raw-panel">
+      <summary>查看巴法云原始返回数据</summary>
+      <pre id="rawData" class="raw-data">等待数据……</pre>
+    </details>
+  </main>
+
+  <script>
+    const REFRESH_INTERVAL = 5000;
+
+    let refreshing = false;
+
+    function firstDefined(...values) {
+      for (const value of values) {
+        if (
+          value !== undefined &&
+          value !== null &&
+          value !== ""
+        ) {
+          return value;
+        }
+      }
+
+      return null;
+    }
+
+    function formatNumber(value, decimals = 1) {
+      if (
+        value === undefined ||
+        value === null ||
+        value === ""
+      ) {
+        return "--";
+      }
+
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return String(value);
+      }
+
+      return number.toFixed(decimals);
+    }
+
+    function parsePossibleJson(value) {
+      if (value === null || value === undefined) {
+        return {};
+      }
+
+      if (typeof value === "object") {
+        return value;
+      }
+
+      if (typeof value !== "string") {
+        return {};
+      }
+
+      const text = value.trim();
+
+      if (!text) {
+        return {};
+      }
+
+      try {
+        const parsed = JSON.parse(text);
+
+        if (
+          parsed !== null &&
+          typeof parsed === "object"
+        ) {
+          return parsed;
+        }
+      } catch (error) {
+        console.debug("不是JSON字符串：", text);
+      }
+
+      return {};
+    }
+
+    function normalizeEnvironmentData(result) {
+      let data = parsePossibleJson(result.data);
+
+      if (
+        Object.keys(data).length === 0 &&
+        result.data &&
+        typeof result.data === "object"
+      ) {
+        data = result.data;
+      }
+
+      const messageData = parsePossibleJson(result.msg);
+
+      if (Object.keys(messageData).length > 0) {
+        data = {
+          ...messageData,
+          ...data
+        };
+      }
+
+      /*
+       * 兼容数据被包在data、payload、message等字段中的情况。
+       */
+      const nestedData = firstDefined(
+        data.data,
+        data.payload,
+        data.message
+      );
+
+      if (
+        nestedData &&
+        typeof nestedData === "object"
+      ) {
+        data = {
+          ...data,
+          ...nestedData
+        };
+      }
+
+      /*
+       * 兼容普通逗号格式：
+       * 26.5,60.2,423
+       */
+      if (
+        firstDefined(
+          data.temperature,
+          data.temp,
+          data.tem
+        ) === null &&
+        typeof result.msg === "string"
+      ) {
+        const parts = result.msg
+          .split(",")
+          .map(item => item.trim());
+
+        if (parts.length >= 2) {
+          data.temperature = parts[0];
+          data.humidity = parts[1];
+
+          if (parts.length >= 3) {
+            data.gas = parts[2];
+          }
+        }
+      }
+
+      return {
+        groupId: firstDefined(
+          data.group_id,
+          data.groupId,
+          data.group,
+          data.groupid
+        ),
+
+        deviceId: firstDefined(
+          data.device_id,
+          data.deviceId,
+          data.device,
+          data.deviceid
+        ),
+
+        temperature: firstDefined(
+          data.temperature,
+          data.temp,
+          data.tem,
+          data.temperature_value
+        ),
+
+        humidity: firstDefined(
+          data.humidity,
+          data.hum,
+          data.humi,
+          data.humidity_value
+        ),
+
+        gas: firstDefined(
+          data.gas,
+          data.gas_value,
+          data.mq2,
+          data.mq2_value,
+          data.smoke,
+          data.smoke_value
+        ),
+
+        gasLevel: firstDefined(
+          data.gas_level,
+          data.gasLevel,
+          data.risk_level
+        )
+      };
+    }
+
+    function calculateRisk(data) {
+      const temperature = Number(data.temperature);
+      const humidity = Number(data.humidity);
+      const gas = Number(data.gas);
+      const gasLevel = Number(data.gasLevel);
+
+      if (
+        Number.isFinite(gasLevel) &&
+        gasLevel >= 2
+      ) {
+        return {
+          level: "danger",
+          name: "危险",
+          reason: "设备上报气体危险等级"
+        };
+      }
+
+      if (
+        Number.isFinite(gas) &&
+        gas >= 800
+      ) {
+        return {
+          level: "danger",
+          name: "危险",
+          reason: "MQ-2气体值超过危险阈值"
+        };
+      }
+
+      if (
+        Number.isFinite(gasLevel) &&
+        gasLevel === 1
+      ) {
+        return {
+          level: "warning",
+          name: "预警",
+          reason: "设备上报气体预警等级"
+        };
+      }
+
+      if (
+        Number.isFinite(gas) &&
+        gas >= 600
+      ) {
+        return {
+          level: "warning",
+          name: "预警",
+          reason: "MQ-2气体值偏高"
+        };
+      }
+
+      if (
+        Number.isFinite(temperature) &&
+        temperature >= 40
+      ) {
+        return {
+          level: "warning",
+          name: "预警",
+          reason: "环境温度偏高"
+        };
+      }
+
+      if (
+        Number.isFinite(humidity) &&
+        (humidity < 20 || humidity > 85)
+      ) {
+        return {
+          level: "warning",
+          name: "预警",
+          reason: "环境湿度超出建议范围"
+        };
+      }
+
+      return {
+        level: "normal",
+        name: "正常",
+        reason: "温湿度和气体状态正常"
+      };
+    }
+
+    function updateRiskDisplay(risk) {
+      const badge = document.getElementById("riskBadge");
+      const reason = document.getElementById("riskReason");
+      const gasCard = document.getElementById("gasCard");
+
+      badge.textContent = risk.name;
+      reason.textContent = risk.reason;
+
+      badge.className = "risk-badge";
+      gasCard.className = "metric-card";
+
+      if (risk.level === "warning") {
+        badge.classList.add("warning");
+        gasCard.classList.add("warning");
+      }
+
+      if (risk.level === "danger") {
+        badge.classList.add("danger");
+        gasCard.classList.add("danger");
+      }
+    }
+
+    function setConnectionState(online, message) {
+      const dot = document.getElementById("stateDot");
+      const cloudText =
+        document.getElementById("cloudStateText");
+      const connection =
+        document.getElementById("connectionValue");
+
+      dot.className = "state-dot";
+
+      if (online) {
+        dot.classList.add("online");
+        cloudText.textContent = "巴法云已连接";
+        connection.textContent = "在线";
+      } else {
+        dot.classList.add("offline");
+        cloudText.textContent = "连接异常";
+        connection.textContent =
+          message || "离线";
+      }
+    }
+
+    async function refreshEnvironmentData() {
+      if (refreshing) {
+        return;
+      }
+
+      refreshing = true;
+
+      const refreshButton =
+        document.getElementById("refreshButton");
+
+      refreshButton.disabled = true;
+      refreshButton.textContent = "刷新中";
+
+      try {
+        const response = await fetch("/api/env", {
+          cache: "no-store"
+        });
+
+        const result = await response.json();
+
+        document.getElementById("rawData").textContent =
+          JSON.stringify(result, null, 2);
+
+        if (!response.ok || !result.ok) {
+          throw new Error(
+            result.error ||
+            result.message ||
+            "读取巴法云数据失败"
+          );
+        }
+
+        const data = normalizeEnvironmentData(result);
+
+        document.getElementById(
+          "temperatureValue"
+        ).textContent = formatNumber(data.temperature);
+
+        document.getElementById(
+          "humidityValue"
+        ).textContent = formatNumber(data.humidity);
+
+        document.getElementById(
+          "gasValue"
+        ).textContent = formatNumber(data.gas, 0);
+
+        document.getElementById(
+          "groupIdValue"
+        ).textContent = data.groupId || "--";
+
+        document.getElementById(
+          "deviceIdValue"
+        ).textContent = data.deviceId || "--";
+
+        document.getElementById(
+          "messageTimeValue"
+        ).textContent = result.time || "--";
+
+        document.getElementById(
+          "refreshTimeValue"
+        ).textContent =
+          new Date().toLocaleString();
+
+        const risk = calculateRisk(data);
+        updateRiskDisplay(risk);
+
+        setConnectionState(true);
+      } catch (error) {
+        console.error("刷新数据失败：", error);
+
+        setConnectionState(
+          false,
+          error.message
+        );
+
+        document.getElementById(
+          "rawData"
+        ).textContent =
+          "读取失败：\n" + error.message;
+      } finally {
+        refreshing = false;
+        refreshButton.disabled = false;
+        refreshButton.textContent = "立即刷新";
+      }
+    }
+
+    async function sendMessage(message) {
+      const sendStatus =
+        document.getElementById("sendStatus");
+      const sendButton =
+        document.getElementById("sendButton");
+
+      const text = String(message || "").trim();
+
+      if (!text) {
+        sendStatus.textContent = "请输入要发送的消息";
+        return;
+      }
+
+      sendButton.disabled = true;
+      sendStatus.textContent = "正在发送……";
+
+      try {
+        const response = await fetch("/api/env/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            msg: text
+          })
+        });
+
+        const result = await response.json();
+
+        document.getElementById("rawData").textContent =
+          JSON.stringify(result, null, 2);
+
+        if (!response.ok || !result.ok) {
+          throw new Error(
+            result.error ||
+            result.message ||
+            "消息发送失败"
+          );
+        }
+
+        sendStatus.textContent =
+          "发送成功：" + text;
+
+        document.getElementById(
+          "messageInput"
+        ).value = "";
+      } catch (error) {
+        console.error("发送失败：", error);
+
+        sendStatus.textContent =
+          "发送失败：" + error.message;
+      } finally {
+        sendButton.disabled = false;
+      }
+    }
+
+    document
+      .getElementById("refreshButton")
+      .addEventListener(
+        "click",
+        refreshEnvironmentData
+      );
+
+    document
+      .getElementById("sendButton")
+      .addEventListener("click", () => {
+        const message =
+          document.getElementById(
+            "messageInput"
+          ).value;
+
+        sendMessage(message);
+      });
+
+    document
+      .getElementById("messageInput")
+      .addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          sendMessage(event.target.value);
+        }
+      });
+
+    document
+      .querySelectorAll("[data-message]")
+      .forEach(button => {
+        button.addEventListener("click", () => {
+          sendMessage(button.dataset.message);
+        });
+      });
+
+    refreshEnvironmentData();
+
+    setInterval(
+      refreshEnvironmentData,
+      REFRESH_INTERVAL
+    );
+  </script>
+</body>
+</html>
