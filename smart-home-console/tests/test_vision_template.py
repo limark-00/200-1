@@ -33,7 +33,10 @@ class VisionTemplateTests(unittest.TestCase):
     def test_dashboard_uses_vision_stream_and_status_endpoints(self):
         self.assertIn('src="/api/vision/stream"', self.html)
         self.assertIn('fetch("/api/vision/status"', self.html)
-        self.assertIn("function refreshVisionStatus()", self.html)
+        self.assertIn(
+            "function refreshVisionStatus(queueRerun = true)",
+            self.html,
+        )
         self.assertIn("function reconnectVisionStream()", self.html)
 
     def test_dashboard_contains_zone_editor_and_event_history(self):
@@ -118,6 +121,22 @@ class VisionTemplateTests(unittest.TestCase):
             self.html.count("visionMutationRevision += 1;"),
             3,
         )
+
+    def test_periodic_polls_do_not_extend_mutation_refresh_chains(self):
+        self.assertIn(
+            "function refreshVisionStatus(queueRerun = true)",
+            self.html,
+        )
+        self.assertIn(
+            "function refreshVisionEvents(queueRerun = true)",
+            self.html,
+        )
+        self.assertGreaterEqual(
+            self.html.count("if (queueRerun)"),
+            2,
+        )
+        self.assertIn("() => refreshVisionStatus(false)", self.html)
+        self.assertIn("() => refreshVisionEvents(false)", self.html)
 
     def test_zone_drag_waits_for_natural_image_dimensions(self):
         self.assertIn("function visionImageReady()", self.html)

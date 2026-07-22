@@ -1866,9 +1866,11 @@
       });
     }
 
-    function refreshVisionEvents() {
+    function refreshVisionEvents(queueRerun = true) {
       if (visionEventRefreshPromise) {
-        visionEventRefreshQueued = true;
+        if (queueRerun) {
+          visionEventRefreshQueued = true;
+        }
         return visionEventRefreshPromise;
       }
 
@@ -2040,9 +2042,11 @@
       }
     }
 
-    function refreshVisionStatus() {
+    function refreshVisionStatus(queueRerun = true) {
       if (visionStatusRefreshPromise) {
-        visionStatusRefreshQueued = true;
+        if (queueRerun) {
+          visionStatusRefreshQueued = true;
+        }
         return visionStatusRefreshPromise;
       }
 
@@ -2404,12 +2408,12 @@
     );
 
     setInterval(
-      refreshVisionStatus,
+      () => refreshVisionStatus(false),
       VISION_STATUS_INTERVAL
     );
 
     setInterval(
-      refreshVisionEvents,
+      () => refreshVisionEvents(false),
       VISION_EVENT_INTERVAL
     );
   </script>
