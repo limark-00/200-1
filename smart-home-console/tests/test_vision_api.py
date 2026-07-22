@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -300,6 +301,141 @@ class VisionApiTests(unittest.TestCase):
         self.assertEqual(response.content, b"configured-jpeg")
         self.assertEqual(resolved, os.path.realpath(directory))
         self.assertNotIn(directory, response.text)
+
+    def test_empty_and_console_root_event_directories_do_not_serve_source(self):
+        unsafe_directories = ("", app_module.BASE_DIR)
+        guessed_files = (
+            "config.py",
+            "app.py",
+            ".env",
+            "data/vision_events.db",
+        )
+
+        for directory in unsafe_directories:
+            with self.subTest(directory="empty" if not directory else "console"):
+                test_app = FastAPI()
+                resolved = app_module.mount_vision_event_files(
+                    test_app,
+                    directory,
+                )
+
+                self.assertEqual(
+                    resolved,
+                    os.path.realpath(
+                        os.path.join(
+                            app_module.BASE_DIR,
+                            "static/vision_events",
+                        )
+                    ),
+                )
+                with TestClient(test_app) as client:
+                    for filename in guessed_files:
+                        with self.subTest(filename=filename):
+                            response = client.get(f"/vision-events/{filename}")
+                            self.assertEqual(response.status_code, 404)
+
+    def test_missing_event_directory_is_not_created_during_mount(self):
+        with tempfile.TemporaryDirectory() as parent:
+            missing = os.path.join(parent, "missing-evidence")
+            test_app = FastAPI()
+
+            resolved = app_module.mount_vision_event_files(test_app, missing)
+
+            self.assertEqual(resolved, os.path.realpath(missing))
+            self.assertFalse(os.path.exists(missing))
+            with TestClient(test_app) as client:
+                response = client.get("/vision-events/not-created.jpg")
+            self.assertEqual(response.status_code, 404)
+            self.assertFalse(os.path.exists(missing))
+
+    def test_generic_static_mount_cannot_bypass_evidence_policy(self):
+        fake = FakeVisionService()
+
+        with self.open_client(fake), TestClient(app_module.app) as client:
+            response = client.get("/static/vision_events/.gitkeep")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_inaccessible_event_directory_is_fail_soft_not_unauthorized(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence_files = app_module.VisionEvidenceFiles(
+                directory=directory,
+                check_dir=False,
+            )
+            test_app = FastAPI()
+            test_app.mount("/vision-events", evidence_files)
+
+            with (
+                patch.object(
+                    evidence_files,
+                    "lookup_path",
+                    side_effect=PermissionError("inaccessible evidence"),
+                ),
+                TestClient(test_app) as client,
+            ):
+                response = client.get("/vision-events/evidence.jpg")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("inaccessible evidence", response.text)
+
+    def test_file_collision_does_not_abort_app_import(self):
+        with tempfile.TemporaryDirectory() as parent:
+            collision = os.path.join(parent, "evidence")
+            with open(collision, "wb") as blocker:
+                blocker.write(b"not a directory")
+            environment = os.environ.copy()
+            environment["VISION_EVENT_DIR"] = collision
+
+            completed = subprocess.run(
+                [sys.executable, "-c", "import app"],
+                cwd=PROJECT_DIR,
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+
+        self.assertEqual(completed.returncode, 0)
+
+    def test_missing_event_directory_does_not_abort_or_mutate_app_import(self):
+        with tempfile.TemporaryDirectory() as parent:
+            missing = os.path.join(parent, "missing-evidence")
+            environment = os.environ.copy()
+            environment["VISION_EVENT_DIR"] = missing
+
+            completed = subprocess.run(
+                [sys.executable, "-c", "import app"],
+                cwd=PROJECT_DIR,
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 0)
+            self.assertFalse(os.path.exists(missing))
+
+    def test_unsafe_event_directory_warning_is_sanitized_in_status(self):
+        fake = FakeVisionService()
+        warning = "视觉证据目录配置不安全，已使用安全默认目录"
+
+        with (
+            patch.object(
+                app_module,
+                "VISION_EVENT_DIRECTORY_WARNING",
+                warning,
+                create=True,
+            ),
+            self.open_client(fake),
+            TestClient(app_module.app) as client,
+        ):
+            response = client.get("/api/vision/status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json().get("storage_error"), warning)
+        self.assertNotIn(app_module.BASE_DIR, response.text)
 
     def test_event_limit_outside_fastapi_bounds_returns_422(self):
         fake = FakeVisionService()

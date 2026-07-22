@@ -39,6 +39,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from pydantic import BaseModel, Field, model_validator
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import bemfa_api
 import camera
@@ -53,6 +54,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 VISION_ALARM_SEND_BUDGET_SECONDS = 0.5
+DEFAULT_VISION_EVENT_DIR = "static/vision_events"
+VISION_EVENT_DIRECTORY_WARNING_TEXT = (
+    "视觉证据目录配置不安全，已使用安全默认目录"
+)
 
 # ---------- 运行时状态（可被页面开关改写）----------
 _runtime_mock = bool(config.MOCK_MODE)
@@ -70,18 +75,81 @@ def _project_path(path: str) -> str:
     return path if os.path.isabs(path) else os.path.join(BASE_DIR, path)
 
 
-def mount_vision_event_files(application: FastAPI, directory: str) -> str:
-    """Mount a resolved evidence directory without publishing its path."""
-    resolved = os.path.realpath(directory)
-    os.makedirs(resolved, exist_ok=True)
+def resolve_vision_event_directory(directory: str) -> tuple[str, str]:
+    """Resolve evidence storage, falling back when a root could expose source."""
+    safe_default = os.path.realpath(
+        os.path.join(BASE_DIR, DEFAULT_VISION_EVENT_DIR)
+    )
+    configured = str(directory or "").strip() or DEFAULT_VISION_EVENT_DIR
+    try:
+        resolved = os.path.realpath(_project_path(configured))
+        common = os.path.commonpath([resolved, BASE_DIR])
+        contains_console = common == resolved
+        filesystem_root = os.path.dirname(resolved) == resolved
+        file_collision = os.path.exists(resolved) and not os.path.isdir(resolved)
+    except (OSError, TypeError, ValueError):
+        return safe_default, VISION_EVENT_DIRECTORY_WARNING_TEXT
+
+    if contains_console or filesystem_root or file_collision:
+        return safe_default, VISION_EVENT_DIRECTORY_WARNING_TEXT
+    return resolved, ""
+
+
+class VisionEvidenceFiles(StaticFiles):
+    """Serve only basename JPEG evidence and treat storage failures as absent."""
+
+    async def check_config(self) -> None:
+        """A missing/unavailable evidence directory is an empty directory."""
+        return None
+
+    async def get_response(self, path: str, scope: dict[str, Any]) -> Response:
+        if (
+            os.path.basename(path) != path
+            or not path.lower().endswith((".jpg", ".jpeg"))
+        ):
+            raise StarletteHTTPException(status_code=404)
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code in {401, 404}:
+                raise StarletteHTTPException(status_code=404) from None
+            raise
+        except (OSError, RuntimeError):
+            raise StarletteHTTPException(status_code=404) from None
+
+
+class ConsoleStaticFiles(StaticFiles):
+    """Serve console assets without exposing the evidence storage subtree."""
+
+    async def get_response(self, path: str, scope: dict[str, Any]) -> Response:
+        normalized = path.replace("\\", "/").lstrip("/")
+        first_segment = normalized.split("/", 1)[0].casefold()
+        if first_segment == "vision_events":
+            raise StarletteHTTPException(status_code=404)
+        return await super().get_response(path, scope)
+
+
+def _mount_resolved_vision_event_files(
+    application: FastAPI,
+    resolved: str,
+) -> None:
     application.mount(
         "/vision-events",
-        StaticFiles(directory=resolved),
+        VisionEvidenceFiles(directory=resolved, check_dir=False),
         name="vision-events",
     )
+
+
+def mount_vision_event_files(application: FastAPI, directory: str) -> str:
+    """Validate and fail-soft mount an evidence directory for isolated apps."""
+    resolved, _warning = resolve_vision_event_directory(directory)
+    _mount_resolved_vision_event_files(application, resolved)
     return resolved
 
 
+VISION_EVENT_DIRECTORY, VISION_EVENT_DIRECTORY_WARNING = (
+    resolve_vision_event_directory(config.VISION_EVENT_DIR)
+)
 event_repository = EventRepository(_project_path(config.VISION_DB_PATH))
 zone_detector = ZoneDetector(
     config.VISION_ENTER_SECONDS,
@@ -125,7 +193,7 @@ vision_service = VisionService(
     zone_detector=zone_detector,
     event_repository=event_repository,
     alarm_controller=alarm_controller,
-    event_snapshot_dir=os.path.realpath(_project_path(config.VISION_EVENT_DIR)),
+    event_snapshot_dir=VISION_EVENT_DIRECTORY,
 )
 
 
@@ -266,11 +334,8 @@ templates.env.filters["tojson"] = _tojson
 # ---------- 静态文件：CSS / JS / 抓拍图片 ----------
 # 注意：mount 要写在具体路由之后也可以，但 /static 不会和 /api 冲突
 os.makedirs(os.path.join(STATIC_DIR, "captures"), exist_ok=True)
-VISION_EVENT_DIRECTORY = mount_vision_event_files(
-    app,
-    _project_path(config.VISION_EVENT_DIR),
-)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+_mount_resolved_vision_event_files(app, VISION_EVENT_DIRECTORY)
+app.mount("/static", ConsoleStaticFiles(directory=STATIC_DIR), name="static")
 
 
 # ---------- 请求体模型（Pydantic：自动校验 + /docs 里能看到字段说明）----------
@@ -410,7 +475,13 @@ async def api_env_send(body: EnvCommandBody):
 @app.get("/api/vision/status", summary="查询YOLO视觉服务状态")
 async def api_vision_status():
     """返回摄像头、模型、当前人数和处理帧率。"""
-    return vision_service.get_status()
+    status = dict(vision_service.get_status())
+    if VISION_EVENT_DIRECTORY_WARNING:
+        status["storage_error"] = (
+            status.get("storage_error")
+            or VISION_EVENT_DIRECTORY_WARNING
+        )
+    return status
 
 
 def _vision_error(exc: Exception, status_code: int) -> JSONResponse:

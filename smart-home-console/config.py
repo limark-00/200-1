@@ -65,7 +65,7 @@ VISION_DB_PATH = os.getenv(
 VISION_EVENT_DIR = os.getenv(
     "VISION_EVENT_DIR",
     "static/vision_events",
-).strip()
+).strip() or "static/vision_events"
 VISION_ENTER_SECONDS = float(os.getenv("VISION_ENTER_SECONDS", "2.0"))
 VISION_EXIT_SECONDS = float(os.getenv("VISION_EXIT_SECONDS", "3.0"))
 

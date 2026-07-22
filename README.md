@@ -23,6 +23,11 @@
 - 📸 **PIR 抓拍** — 人体感应触发时自动拍照，支持照片墙浏览
 - 🔄 **双模式** — 模拟模式（无硬件可跑）与真实巴法云模式一键切换
 
+### 第二阶段（YOLO 区域警报）
+
+第二阶段的运行、配置、API、部署、安全边界和验收步骤以
+[smart-home-console/README.md](./smart-home-console/README.md) 为唯一权威说明。本页只保留项目概览和本机快速启动入口；请勿根据旧副本或历史部署示例配置生产环境。
+
 ```
 ┌──────────┐     HTTP      ┌──────────────┐     HTTP API     ┌──────────┐
 │  浏览器   │ ◄──────────► │  FastAPI 后端  │ ◄─────────────► │  巴法云   │
@@ -64,7 +69,8 @@ source .venv/bin/activate       # Linux / macOS
 pip install -r requirements.txt
 
 # 4. 配置巴法云（可选，不影响模拟模式）
-#    编辑 config.py，设置 BEMFA_UID 环境变量或修改默认值
+#    仅在运行环境中注入，不要把真实值写入仓库
+export BEMFA_UID='<your-bemfa-uid>'
 
 # 5. 启动
 python app.py
@@ -84,7 +90,7 @@ python app.py
 ```
 smart-home-console/
 ├── app.py                 # FastAPI 主程序：路由 / 生命周期 / PIR 轮询线程
-├── config.py              # 全局配置：UID、Topic、端口、模式开关
+├── config.py              # 全局非敏感默认配置；凭据从运行环境读取
 ├── bemfa_api.py           # 巴法云 HTTP 封装：getmsg / send / Mock
 ├── camera.py              # 摄像头抓拍：OpenCV 拍照 + 占位图降级 + 图像识别预留
 ├── requirements.txt       # Python 依赖清单
@@ -136,7 +142,7 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 
 ## ⚙️ 配置说明
 
-编辑 `config.py` 或通过环境变量覆盖：
+非敏感默认值可按项目说明调整；巴法云 UID、令牌等凭据必须仅通过环境变量或仓库外配置文件注入。真实凭据不得写入或提交到 `config.py`、README、脚本或其他受版本控制文件，也不要提交包含凭据的 `.env` 文件。凭据一旦出现在日志、聊天、提交或其他非预期位置，应视为已泄露；泄露后立即轮换。
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |--------|---------|--------|------|
@@ -177,64 +183,15 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 
 ---
 
-## 📦 服务器部署（Linux + Nginx + systemd）
+## 📦 部署与访问控制
 
-```bash
-# 1. 进入项目目录，安装依赖
-cd smart-home-console
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+**本应用不包含内置身份认证，禁止直接暴露到公网。** 控制接口、视觉事件、证据图片和 API 文档都可能包含敏感能力或信息。部署时必须采用并验证以下边界之一：
 
-# 2. 配置 Nginx 反向代理
-sudo tee /etc/nginx/sites-available/smart-home << 'EOF'
-server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$host$request_uri;
-}
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-    ssl_certificate /etc/nginx/cert/xxx.pem;
-    ssl_certificate_key /etc/nginx/cert/xxx.key;
-    location / {
-        proxy_pass http://127.0.0.1:5001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
-sudo ln -s /etc/nginx/sites-available/smart-home /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+- 仅允许可信局域网访问，并使用主机或云防火墙拒绝公网入站；
+- 仅允许已授权用户通过 VPN 访问；
+- 确需经公网到达时，在 TLS 终端启用可审计的反向代理身份认证，并默认拒绝未认证请求。
 
-# 3. 创建 systemd 服务
-sudo tee /etc/systemd/system/smart-home.service << 'EOF'
-[Unit]
-Description=Smart Home Console
-After=network.target
-[Service]
-User=www
-WorkingDirectory=/path/to/smart-home-console
-Environment="PATH=/path/to/.venv/bin:/usr/bin"
-ExecStart=/path/to/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 5001
-Restart=always
-RestartSec=3
-[Install]
-WantedBy=multi-user.target
-EOF
-sudo systemctl daemon-reload
-sudo systemctl enable --now smart-home
-```
-
-### 管理命令
-
-```bash
-sudo systemctl status smart-home     # 查看状态
-sudo systemctl restart smart-home   # 重启
-sudo journalctl -u smart-home -f    # 实时日志
-```
+不要从本页复制历史域名或无认证反向代理示例。Nginx、systemd、备份、恢复和第二阶段验收的当前配置见 [smart-home-console/README.md](./smart-home-console/README.md)。
 
 ---
 
