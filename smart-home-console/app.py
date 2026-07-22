@@ -20,25 +20,33 @@ app.py —— FastAPI 主程序
 from __future__ import annotations
 
 import json
+import math
 import os
+import sqlite3
 import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 import bemfa_api
 import camera
 import config
+from event_repository import EventClosedError, EventNotFoundError, EventRepository
+from vision_alarm import VisionAlarmController
 from vision_service import VisionService, VisionSettings
+from zone_detector import NormalizedZone, ZoneDetector
 
 # ---------- 路径：以本文件所在目录为项目根，避免启动目录不对导致找不到模板/静态文件 ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,7 +64,20 @@ _poller_started = False
 _poller_lock = threading.Lock()
 _poller_stop = threading.Event()
 
-# 整个进程共用同一个摄像头和 YOLO 模型，避免每个浏览器请求重复打开设备。
+# 整个进程共用同一套视觉、区域和事件依赖。
+def _project_path(path: str) -> str:
+    return path if os.path.isabs(path) else os.path.join(BASE_DIR, path)
+
+
+event_repository = EventRepository(_project_path(config.VISION_DB_PATH))
+zone_detector = ZoneDetector(
+    config.VISION_ENTER_SECONDS,
+    config.VISION_EXIT_SECONDS,
+)
+alarm_controller = VisionAlarmController(
+    lambda command: bemfa_api.send_msg(config.ENV_TOPIC, command),
+    delivery_callback=event_repository.mark_delivery,
+)
 vision_service = VisionService(
     VisionSettings(
         enabled=config.VISION_ENABLED,
@@ -69,7 +90,11 @@ vision_service = VisionService(
         height=config.VISION_FRAME_HEIGHT,
         jpeg_quality=config.VISION_JPEG_QUALITY,
         reconnect_delay=config.VISION_RECONNECT_DELAY,
-    )
+    ),
+    zone_detector=zone_detector,
+    event_repository=event_repository,
+    alarm_controller=alarm_controller,
+    event_snapshot_dir=_project_path(config.VISION_EVENT_DIR),
 )
 
 
@@ -155,6 +180,7 @@ async def lifespan(_app: FastAPI):
     - 关闭时：释放摄像头并通知线程停止
     比在模块 import 时直接起线程更清晰，也适合 uvicorn 多 worker 场景的理解。
     """
+    vision_service.initialize_safety()
     vision_service.start()
     if getattr(config, "ENABLE_PIR_POLLER", False):
         _start_poller_once()
@@ -168,6 +194,7 @@ async def lifespan(_app: FastAPI):
         yield
     finally:
         vision_service.stop()
+        vision_service.shutdown_safety()
         if getattr(config, "ENABLE_PIR_POLLER", False):
             _stop_poller()
 
@@ -178,6 +205,17 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error(_request: Request, exc: RequestValidationError):
+    """Keep FastAPI's 422 shape serializable for rejected NaN/Infinity inputs."""
+    errors = exc.errors()
+    for error in errors:
+        value = error.get("input")
+        if isinstance(value, float) and not math.isfinite(value):
+            error["input"] = str(value)
+    return JSONResponse(status_code=422, content=jsonable_encoder({"detail": errors}))
 
 # ---------- 模板（Jinja2）----------
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
@@ -214,6 +252,19 @@ class ControlBody(BaseModel):
 
 class MockPirBody(BaseModel):
     triggered: bool = Field(True, description="是否模拟为有人/触发")
+
+
+class VisionZoneBody(BaseModel):
+    x: float = Field(..., ge=0.0, le=1.0)
+    y: float = Field(..., ge=0.0, le=1.0)
+    width: float = Field(..., ge=0.02, le=1.0)
+    height: float = Field(..., ge=0.02, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_frame_bounds(self):
+        if self.x + self.width > 1.0 or self.y + self.height > 1.0:
+            raise ValueError("区域超出画面范围")
+        return self
 
 # ==================== 页面 ====================
 
@@ -326,6 +377,84 @@ async def api_env_send(body: EnvCommandBody):
 async def api_vision_status():
     """返回摄像头、模型、当前人数和处理帧率。"""
     return vision_service.get_status()
+
+
+def _vision_error(exc: Exception, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"ok": False, "error": str(exc) or exc.__class__.__name__},
+    )
+
+
+def _event_response(event: dict[str, Any]) -> dict[str, Any]:
+    result = dict(event)
+    filename = result.get("snapshot_filename")
+    result["snapshot_url"] = (
+        f"/static/vision_events/{quote(str(filename), safe='')}"
+        if filename
+        else None
+    )
+    return result
+
+
+@app.get("/api/vision/zone", summary="查询危险区域")
+async def api_vision_zone_get():
+    try:
+        return {"ok": True, "zone": vision_service.get_status().get("zone")}
+    except (sqlite3.Error, OSError) as exc:
+        return _vision_error(exc, 503)
+    except Exception as exc:  # noqa: BLE001
+        return _vision_error(exc, 500)
+
+
+@app.put("/api/vision/zone", summary="保存危险区域")
+async def api_vision_zone_put(body: VisionZoneBody):
+    try:
+        zone = NormalizedZone(body.x, body.y, body.width, body.height)
+        return {"ok": True, "zone": vision_service.save_zone(zone)}
+    except ValueError as exc:
+        return _vision_error(exc, 422)
+    except (sqlite3.Error, OSError) as exc:
+        return _vision_error(exc, 503)
+    except Exception as exc:  # noqa: BLE001
+        return _vision_error(exc, 500)
+
+
+@app.delete("/api/vision/zone", summary="删除危险区域")
+async def api_vision_zone_delete():
+    try:
+        vision_service.delete_zone()
+        return {"ok": True, "zone": None}
+    except (sqlite3.Error, OSError) as exc:
+        return _vision_error(exc, 503)
+    except Exception as exc:  # noqa: BLE001
+        return _vision_error(exc, 500)
+
+
+@app.get("/api/vision/events", summary="查询危险区域事件")
+async def api_vision_events(limit: int = Query(50, ge=1, le=200)):
+    try:
+        events = vision_service.list_events(limit)
+        return {"ok": True, "events": [_event_response(event) for event in events]}
+    except (sqlite3.Error, OSError) as exc:
+        return _vision_error(exc, 503)
+    except Exception as exc:  # noqa: BLE001
+        return _vision_error(exc, 500)
+
+
+@app.post("/api/vision/events/{event_id}/ack", summary="确认危险区域事件")
+async def api_vision_event_ack(event_id: int):
+    try:
+        event = vision_service.acknowledge_event(event_id)
+        return {"ok": True, "event": _event_response(event)}
+    except EventNotFoundError as exc:
+        return _vision_error(exc, 404)
+    except EventClosedError as exc:
+        return _vision_error(exc, 409)
+    except (sqlite3.Error, OSError) as exc:
+        return _vision_error(exc, 503)
+    except Exception as exc:  # noqa: BLE001
+        return _vision_error(exc, 500)
 
 
 @app.get("/api/vision/frame", summary="获取最新YOLO标注帧")
