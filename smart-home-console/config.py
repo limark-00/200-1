@@ -58,6 +58,16 @@ VISION_FRAME_WIDTH = int(os.getenv("VISION_FRAME_WIDTH", "640"))
 VISION_FRAME_HEIGHT = int(os.getenv("VISION_FRAME_HEIGHT", "480"))
 VISION_JPEG_QUALITY = int(os.getenv("VISION_JPEG_QUALITY", "80"))
 VISION_RECONNECT_DELAY = float(os.getenv("VISION_RECONNECT_DELAY", "2.0"))
+VISION_DB_PATH = os.getenv(
+    "VISION_DB_PATH",
+    "data/vision_events.db",
+).strip()
+VISION_EVENT_DIR = os.getenv(
+    "VISION_EVENT_DIR",
+    "static/vision_events",
+).strip()
+VISION_ENTER_SECONDS = float(os.getenv("VISION_ENTER_SECONDS", "2.0"))
+VISION_EXIT_SECONDS = float(os.getenv("VISION_EXIT_SECONDS", "3.0"))
 
 APP_HOST = "0.0.0.0"
 APP_PORT = 5001

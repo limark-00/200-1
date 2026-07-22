@@ -19,3 +19,10 @@ static/captures/*
 # YOLO 模型权重和默认运行输出
 *.pt
 runs/
+
+# Vision event persistence and evidence
+data/*.db
+data/*.db-shm
+data/*.db-wal
+static/vision_events/*
+!static/vision_events/.gitkeep
