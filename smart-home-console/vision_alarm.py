@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 
+ALARM_DELIVERY_ERROR = "视觉告警指令发送失败"
+
+
 @dataclass(frozen=True)
 class AlarmTask:
     enabled: bool
@@ -145,15 +148,15 @@ class VisionAlarmController:
                     return
             try:
                 result = self._sender(command)
-            except Exception as exc:  # Sender is an injected network boundary.
-                error = str(exc) or exc.__class__.__name__
+            except Exception:  # Sender is an injected network boundary.
+                error = ALARM_DELIVERY_ERROR
                 continue
 
             if result.get("ok", False):
                 delivered = True
                 error = ""
                 break
-            error = str(result.get("error") or "alarm command failed")
+            error = ALARM_DELIVERY_ERROR
 
         superseded = self._is_superseded(task)
         if superseded and not delivered:

@@ -29,6 +29,7 @@ _mock_store: dict[str, str] = {
             "humidity_threshold": 40.0,
             "manual_alarm": 0,
             "humidity_silenced": 0,
+            "vision_alarm": 0,
             "state": "online",
             "source": "aht20",
         },
@@ -66,6 +67,7 @@ def get_topic_msg(topic: str) -> dict[str, Any]:
                     "humidity_threshold": 40.0,
                     "manual_alarm": 0,
                     "humidity_silenced": 0,
+                    "vision_alarm": 0,
                     "state": "online",
                     "source": "aht20",
                 }
@@ -105,23 +107,23 @@ def get_topic_msg(topic: str) -> dict[str, Any]:
         resp = requests.get(GET_MSG_URL, params=params, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-    except requests.RequestException as exc:
+    except requests.RequestException:
         return {
             "ok": False,
             "topic": topic,
             "msg": "",
             "time": "",
             "raw": None,
-            "error": f"网络请求失败：{exc}",
+            "error": "巴法云网络请求失败",
         }
-    except ValueError as exc:
+    except ValueError:
         return {
             "ok": False,
             "topic": topic,
             "msg": "",
             "time": "",
-            "raw": resp.text[:500],
-            "error": f"响应不是JSON：{exc}",
+            "raw": None,
+            "error": "巴法云响应格式错误",
         }
 
     if data.get("code") != 0:
@@ -130,10 +132,8 @@ def get_topic_msg(topic: str) -> dict[str, Any]:
             "topic": topic,
             "msg": "",
             "time": "",
-            "raw": data,
-            "error": data.get("message")
-            or data.get("msg")
-            or "巴法云返回错误",
+            "raw": None,
+            "error": "巴法云返回错误",
         }
 
     items = data.get("data") or []
@@ -194,7 +194,7 @@ def send_msg(topic: str, msg: str) -> dict[str, Any]:
         resp = requests.post(POST_MSG_URL, json=payload, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-    except (requests.RequestException, ValueError) as exc:
+    except (requests.RequestException, ValueError):
         try:
             resp = requests.get(
                 LEGACY_SEND_MSG_URL,
@@ -203,23 +203,18 @@ def send_msg(topic: str, msg: str) -> dict[str, Any]:
             )
             resp.raise_for_status()
             data = resp.json()
-        except Exception as fallback_exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             return {
                 "ok": False,
-                "error": (
-                    f"下发失败：{exc}；"
-                    f"兼容接口也失败：{fallback_exc}"
-                ),
+                "error": "巴法云指令下发失败",
                 "raw": None,
             }
 
     if data.get("code") != 0:
         return {
             "ok": False,
-            "error": data.get("message")
-            or data.get("msg")
-            or "下发失败",
-            "raw": data,
+            "error": "巴法云指令下发失败",
+            "raw": None,
         }
 
     return {"ok": True, "error": "", "raw": data}

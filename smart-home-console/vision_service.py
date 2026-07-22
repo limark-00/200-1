@@ -340,7 +340,7 @@ class VisionService:
                 "fps": round(self._fps, 1),
                 "last_error": self._last_error,
                 "camera_index": self.settings.camera_index,
-                "model_name": self.settings.model_name,
+                "model_name": os.path.basename(self.settings.model_name),
             }
 
         with self._safety_lock:
@@ -629,12 +629,12 @@ class VisionService:
         try:
             with open(filepath, "wb") as file:
                 file.write(jpeg)
-        except OSError as exc:
+        except OSError:
             return {
                 "ok": False,
                 "filename": "",
                 "path": "",
-                "error": f"保存视觉截图失败：{exc}",
+                "error": "保存视觉截图失败",
             }
 
         return {
@@ -742,8 +742,8 @@ class VisionService:
             os.makedirs(self._event_snapshot_dir, exist_ok=True)
             with open(filepath, "wb") as file:
                 file.write(jpeg)
-        except OSError as exc:
-            return "", f"保存视觉告警截图失败：{exc}"
+        except OSError:
+            return "", "保存视觉告警截图失败"
         return filename, ""
 
     def _update_safety_timers(
@@ -935,11 +935,11 @@ class VisionService:
                         if (frame_number - 1) % self.settings.frame_skip != 0:
                             continue
                         self.process_frame(model, frame)
-                except Exception as exc:  # noqa: BLE001
+                except Exception:  # noqa: BLE001
                     self._mark_observation_gap()
                     with self._lock:
                         self._camera_online = False
-                        self._last_error = str(exc)
+                        self._last_error = "视觉处理暂时失败"
                     if self._stop_event.wait(self.settings.reconnect_delay):
                         break
                     self._mark_observation_gap()
@@ -947,11 +947,11 @@ class VisionService:
                     if capture is not None:
                         capture.release()
                         capture = None
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             self._mark_observation_gap()
             with self._lock:
                 self._model_loaded = False
-                self._last_error = f"YOLO模型加载失败：{exc}"
+                self._last_error = "YOLO模型加载失败"
         finally:
             if capture is not None:
                 capture.release()

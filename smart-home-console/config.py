@@ -6,7 +6,7 @@ import os
 # 建议通过环境变量设置：
 # Windows PowerShell：
 # $env:BEMFA_UID="你的巴法云私钥"
-BEMFA_UID = os.getenv("BEMFA_UID", "554419557d4567eb2f683d752c6aad23").strip()
+BEMFA_UID = os.getenv("BEMFA_UID", "").strip()
 
 # 1=MQTT主题，3=TCP主题。env004若在MQTT设备云创建，保持1。
 BEMFA_TYPE = int(os.getenv("BEMFA_TYPE", "1"))

@@ -498,7 +498,8 @@ class VisionServiceTests(unittest.TestCase):
 
         event = repository.list_events()[0]
         self.assertEqual(event["snapshot_filename"], "")
-        self.assertIn("not-a-directory", event["last_error"])
+        self.assertEqual(event["last_error"], "保存视觉告警截图失败")
+        self.assertNotIn(temporary.name, str(event))
         self.assertEqual(alarm.targets, [(True, event["id"])])
 
     def test_successful_alarm_delivery_preserves_snapshot_failure_error(self):
@@ -519,7 +520,8 @@ class VisionServiceTests(unittest.TestCase):
 
         event = repository.get_event(event_id)
         self.assertTrue(event["alarm_on_delivered"])
-        self.assertIn("not-a-directory", event["last_error"])
+        self.assertEqual(event["last_error"], "保存视觉告警截图失败")
+        self.assertNotIn(temporary.name, str(event))
 
     def test_event_creation_failure_does_not_bind_fake_id_but_still_alarms(self):
         class CreateFailingRepository(EventRepository):
@@ -862,6 +864,20 @@ class VisionServiceTests(unittest.TestCase):
             status["zone"],
             {"x": 0.1, "y": 0.1, "width": 0.8, "height": 0.8},
         )
+
+    def test_status_does_not_expose_absolute_model_path(self):
+        service = self.make_service()
+        service.settings = VisionSettings(
+            **{
+                **service.settings.__dict__,
+                "model_name": "/private/runtime/models/yolo.pt",
+            }
+        )
+
+        status = service.get_status()
+
+        self.assertEqual(status["model_name"], "yolo.pt")
+        self.assertNotIn("/private/runtime", str(status))
 
     def test_initialize_storage_failure_keeps_detector_disabled_and_forces_off(self):
         class InitializeFailingRepository:

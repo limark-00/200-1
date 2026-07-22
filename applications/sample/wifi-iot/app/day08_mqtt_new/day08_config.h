@@ -34,7 +34,7 @@
 
 /* 必须与 MQTTX / 巴法控制台密钥一致 */
 #ifndef DAY08_MQTT_CLIENT_ID
-#define DAY08_MQTT_CLIENT_ID  "554419557d4567eb2f683d752c6aad23"
+#define DAY08_MQTT_CLIENT_ID  "REPLACE_WITH_BEMFA_UID"
 #endif
 
 /* 巴法控制台已创建的主题名（MQTTX 订阅同一主题可看到上报） */

@@ -48,6 +48,7 @@ class VisionTemplateTests(unittest.TestCase):
             "visionActiveAlert",
             "visionAckButton",
             "visionEventList",
+            "boardVisionAlarmValue",
         ):
             self.assertIn(f'id="{element_id}"', self.html)
 
@@ -57,6 +58,9 @@ class VisionTemplateTests(unittest.TestCase):
         self.assertIn("function imageContentRect()", self.html)
         self.assertIn("function normalizedZoneFromDrag", self.html)
         self.assertIn('fetch("/api/vision/alarm/silence"', self.html)
+        self.assertIn("visionAlarm:", self.html)
+        self.assertIn('data.visionAlarm', self.html)
+        self.assertIn('/vision-events/', self.html)
 
     def test_event_refresh_is_single_flight_with_one_queued_rerun(self):
         self.assertIn("let visionEventRefreshPromise = null;", self.html)

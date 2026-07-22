@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
@@ -216,6 +218,22 @@ class VisionApiTests(unittest.TestCase):
         self.assertTrue(all(response.status_code == 422 for response in responses))
         self.assertIsNone(fake.zone)
 
+    def test_zone_rejects_booleans_and_coercive_strings(self):
+        fake = FakeVisionService()
+        invalid_zones = [
+            {"x": True, "y": 0.2, "width": 0.4, "height": 0.5},
+            {"x": "0.1", "y": 0.2, "width": 0.4, "height": 0.5},
+            {"x": {}, "y": 0.2, "width": 0.4, "height": 0.5},
+        ]
+        with self.open_client(fake), TestClient(app_module.app) as client:
+            responses = [
+                client.put("/api/vision/zone", json=zone)
+                for zone in invalid_zones
+            ]
+
+        self.assertTrue(all(response.status_code == 422 for response in responses))
+        self.assertIsNone(fake.zone)
+
     def test_events_use_default_order_and_safe_snapshot_urls(self):
         fake = FakeVisionService()
         with self.open_client(fake), TestClient(app_module.app) as client:
@@ -226,10 +244,40 @@ class VisionApiTests(unittest.TestCase):
         self.assertEqual([event["id"] for event in events], [22, 21])
         self.assertEqual(
             events[0]["snapshot_url"],
-            "/static/vision_events/closed%20event.jpg",
+            "/vision-events/closed%20event.jpg",
         )
         self.assertIsNone(events[1]["snapshot_url"])
         self.assertNotIn(os.path.abspath("static/vision_events"), response.text)
+
+    def test_unsafe_snapshot_filename_is_not_returned_or_linked(self):
+        fake = FakeVisionService()
+        secret_directory = "/private/runtime/evidence"
+        fake.events[0]["snapshot_filename"] = (
+            f"{secret_directory}/event.jpg"
+        )
+
+        with self.open_client(fake), TestClient(app_module.app) as client:
+            response = client.get("/api/vision/events")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["events"][0]["snapshot_filename"], "")
+        self.assertIsNone(response.json()["events"][0]["snapshot_url"])
+        self.assertNotIn(secret_directory, response.text)
+
+    def test_non_default_event_directory_is_served_on_dedicated_mount(self):
+        with tempfile.TemporaryDirectory() as directory:
+            filename = "configured-event.jpg"
+            with open(os.path.join(directory, filename), "wb") as evidence:
+                evidence.write(b"configured-jpeg")
+            test_app = FastAPI()
+            resolved = app_module.mount_vision_event_files(test_app, directory)
+
+            response = TestClient(test_app).get(f"/vision-events/{filename}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"configured-jpeg")
+        self.assertEqual(resolved, os.path.realpath(directory))
+        self.assertNotIn(directory, response.text)
 
     def test_event_limit_outside_fastapi_bounds_returns_422(self):
         fake = FakeVisionService()
@@ -239,6 +287,17 @@ class VisionApiTests(unittest.TestCase):
 
         self.assertEqual(too_large.status_code, 422)
         self.assertEqual(too_small.status_code, 422)
+
+    def test_event_id_outside_sqlite_integer_range_returns_422(self):
+        fake = FakeVisionService()
+        with self.open_client(fake), TestClient(app_module.app) as client:
+            zero = client.post("/api/vision/events/0/ack")
+            oversized = client.post(
+                "/api/vision/events/9223372036854775808/ack"
+            )
+
+        self.assertEqual(zero.status_code, 422)
+        self.assertEqual(oversized.status_code, 422)
 
     def test_acknowledging_closed_event_returns_409(self):
         fake = FakeVisionService()
@@ -305,8 +364,36 @@ class VisionApiTests(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(
-                    response.json(), {"ok": False, "error": str(error)}
+                    response.json(),
+                    {"ok": False, "error": "视觉事件存储不可用"},
                 )
+
+    def test_env_reads_publish_topic_and_returns_board_vision_alarm(self):
+        fake = FakeVisionService()
+        topics = []
+
+        def get_topic(topic):
+            topics.append(topic)
+            return {
+                "ok": True,
+                "topic": topic,
+                "msg": '{"temperature":25.0,"vision_alarm":1}',
+                "time": "now",
+                "raw": None,
+                "error": "",
+            }
+
+        with (
+            patch.object(app_module.config, "ENV_TOPIC", "env-control"),
+            patch.object(app_module.config, "ENV_PUB_TOPIC", "env-control/up"),
+            patch.object(app_module.bemfa_api, "get_topic_msg", side_effect=get_topic),
+            self.open_client(fake),
+            TestClient(app_module.app) as client,
+        ):
+            response = client.get("/api/env")
+
+        self.assertEqual(topics, ["env-control/up"])
+        self.assertEqual(response.json()["data"]["vision_alarm"], 1)
 
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ from typing import Any
 from urllib.parse import quote
 
 import uvicorn
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Path as ApiPath, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -69,6 +69,18 @@ def _project_path(path: str) -> str:
     return path if os.path.isabs(path) else os.path.join(BASE_DIR, path)
 
 
+def mount_vision_event_files(application: FastAPI, directory: str) -> str:
+    """Mount a resolved evidence directory without publishing its path."""
+    resolved = os.path.realpath(directory)
+    os.makedirs(resolved, exist_ok=True)
+    application.mount(
+        "/vision-events",
+        StaticFiles(directory=resolved),
+        name="vision-events",
+    )
+    return resolved
+
+
 event_repository = EventRepository(_project_path(config.VISION_DB_PATH))
 zone_detector = ZoneDetector(
     config.VISION_ENTER_SECONDS,
@@ -101,7 +113,7 @@ vision_service = VisionService(
     zone_detector=zone_detector,
     event_repository=event_repository,
     alarm_controller=alarm_controller,
-    event_snapshot_dir=_project_path(config.VISION_EVENT_DIR),
+    event_snapshot_dir=os.path.realpath(_project_path(config.VISION_EVENT_DIR)),
 )
 
 
@@ -243,6 +255,10 @@ templates.env.filters["tojson"] = _tojson
 # ---------- 静态文件：CSS / JS / 抓拍图片 ----------
 # 注意：mount 要写在具体路由之后也可以，但 /static 不会和 /api 冲突
 os.makedirs(os.path.join(STATIC_DIR, "captures"), exist_ok=True)
+VISION_EVENT_DIRECTORY = mount_vision_event_files(
+    app,
+    _project_path(config.VISION_EVENT_DIR),
+)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -262,10 +278,10 @@ class MockPirBody(BaseModel):
 
 
 class VisionZoneBody(BaseModel):
-    x: float = Field(..., ge=0.0, le=1.0)
-    y: float = Field(..., ge=0.0, le=1.0)
-    width: float = Field(..., ge=0.02, le=1.0)
-    height: float = Field(..., ge=0.02, le=1.0)
+    x: float = Field(..., ge=0.0, le=1.0, strict=True)
+    y: float = Field(..., ge=0.0, le=1.0, strict=True)
+    width: float = Field(..., ge=0.02, le=1.0, strict=True)
+    height: float = Field(..., ge=0.02, le=1.0, strict=True)
 
     @model_validator(mode="after")
     def validate_frame_bounds(self):
@@ -336,7 +352,7 @@ async def api_control(body: ControlBody):
 
 @app.get("/api/env", summary="读取env004最新环境数据")
 async def api_env():
-    result = bemfa_api.get_topic_msg(config.ENV_TOPIC)
+    result = bemfa_api.get_topic_msg(config.ENV_PUB_TOPIC)
     if not result.get("ok"):
         return JSONResponse(content=result, status_code=502)
     result["data"] = bemfa_api.parse_env_message(result.get("msg", ""))
@@ -387,17 +403,32 @@ async def api_vision_status():
 
 
 def _vision_error(exc: Exception, status_code: int) -> JSONResponse:
+    if status_code == 503:
+        message = "视觉事件存储不可用"
+    elif status_code >= 500:
+        message = "视觉服务请求失败"
+    else:
+        message = str(exc) or exc.__class__.__name__
     return JSONResponse(
         status_code=status_code,
-        content={"ok": False, "error": str(exc) or exc.__class__.__name__},
+        content={"ok": False, "error": message},
     )
 
 
 def _event_response(event: dict[str, Any]) -> dict[str, Any]:
     result = dict(event)
     filename = result.get("snapshot_filename")
+    if not isinstance(filename, str) or (
+        not filename
+        or filename in {".", ".."}
+        or os.path.basename(filename) != filename
+        or "/" in filename
+        or "\\" in filename
+    ):
+        filename = ""
+    result["snapshot_filename"] = filename
     result["snapshot_url"] = (
-        f"/static/vision_events/{quote(str(filename), safe='')}"
+        f"/vision-events/{quote(filename, safe='')}"
         if filename
         else None
     )
@@ -450,7 +481,9 @@ async def api_vision_events(limit: int = Query(50, ge=1, le=200)):
 
 
 @app.post("/api/vision/events/{event_id}/ack", summary="确认危险区域事件")
-async def api_vision_event_ack(event_id: int):
+async def api_vision_event_ack(
+    event_id: int = ApiPath(ge=1, le=2**63 - 1),
+):
     try:
         event = vision_service.acknowledge_event(event_id)
         return {"ok": True, "event": _event_response(event)}
@@ -548,9 +581,13 @@ async def api_capture_now():
     else:
         # 视觉服务被关闭或尚未就绪时，保留原有单次抓拍能力。
         result = camera.capture_photo()
-    if not result.get("ok"):
-        return JSONResponse(content=result, status_code=500)
-    return result
+    public_result = dict(result)
+    if public_result.get("path"):
+        public_result["path"] = os.path.basename(str(public_result["path"]))
+    if not public_result.get("ok"):
+        public_result["error"] = "保存视觉截图失败"
+        return JSONResponse(content=public_result, status_code=500)
+    return public_result
 
 
 if __name__ == "__main__":

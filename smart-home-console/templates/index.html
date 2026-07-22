@@ -929,6 +929,11 @@
           </div>
 
           <div class="info-row">
+            <span class="info-label">开发板视觉告警</span>
+            <span id="boardVisionAlarmValue" class="info-value">--</span>
+          </div>
+
+          <div class="info-row">
             <span class="info-label">巴法云主题</span>
             <span class="info-value">env004</span>
           </div>
@@ -1278,6 +1283,11 @@
           data.gas_level,
           data.gasLevel,
           data.risk_level
+        ),
+
+        visionAlarm: firstDefined(
+          data.vision_alarm,
+          data.visionAlarm
         )
       };
     }
@@ -1804,7 +1814,7 @@
 
         if (
           snapshotFilename &&
-          snapshotUrl.startsWith("/static/vision_events/")
+          snapshotUrl.startsWith("/vision-events/")
         ) {
           const link = document.createElement("a");
           link.className = "vision-event-evidence";
@@ -2133,6 +2143,14 @@
         document.getElementById(
           "deviceIdValue"
         ).textContent = data.deviceId || "--";
+
+        document.getElementById(
+          "boardVisionAlarmValue"
+        ).textContent = Number(data.visionAlarm) === 1
+          ? "已开启"
+          : Number(data.visionAlarm) === 0
+            ? "已关闭"
+            : "--";
 
         document.getElementById(
           "messageTimeValue"

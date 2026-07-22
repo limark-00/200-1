@@ -97,7 +97,7 @@ class VisionAlarmControllerTests(unittest.TestCase):
 
         self.assertEqual(
             deliveries,
-            [(14, "vision_alarm_off", False, "broker unavailable")],
+            [(14, "vision_alarm_off", False, "视觉告警指令发送失败")],
         )
 
     def test_delivery_callback_failure_is_surfaced_without_replacing_sender_error(self):
@@ -129,10 +129,31 @@ class VisionAlarmControllerTests(unittest.TestCase):
         controller = make_controller(lambda _command: next(responses))
 
         controller._deliver(AlarmTask(True, 1))
-        self.assertEqual(controller.get_last_error(), "offline")
+        self.assertEqual(controller.get_last_error(), "视觉告警指令发送失败")
         controller._deliver(AlarmTask(False, 1))
 
         self.assertEqual(controller.get_last_error(), "")
+
+    def test_sender_exception_is_sanitized_before_state_and_callback(self):
+        secret = "secret-bemfa-uid"
+        deliveries = []
+
+        def sender(_command):
+            raise RuntimeError(
+                f"https://example.test/send?uid={secret}&topic=env"
+            )
+
+        controller = make_controller(
+            sender,
+            delivery_callback=lambda *args: deliveries.append(args),
+        )
+
+        controller._deliver(AlarmTask(True, 3))
+
+        self.assertEqual(controller.get_last_error(), "视觉告警指令发送失败")
+        self.assertEqual(deliveries[-1][-1], "视觉告警指令发送失败")
+        self.assertNotIn(secret, str(deliveries))
+        self.assertNotIn("?uid=", str(deliveries))
 
     def test_wait_idle_times_out_while_sender_is_blocked(self):
         started = threading.Event()
