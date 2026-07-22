@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "MQTTClient.h"
+#include "cmsis_os2.h"
 
 /* 2.0change */
  
@@ -46,6 +47,44 @@
 static Day08AlarmState g_alarm_state = {0};
 static volatile int g_buzzer_is_on = 0;
 static int g_buzzer_initialized = 0;
+static osMutexId_t g_alarm_mutex = NULL;
+
+static int Day08_AlarmMutexInit(void)
+{
+    if (g_alarm_mutex != NULL) {
+        return 0;
+    }
+
+    g_alarm_mutex = osMutexNew(NULL);
+    if (g_alarm_mutex == NULL) {
+        printf("[day08][alarm] mutex initialization failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int Day08_AlarmLock(void)
+{
+    if (g_alarm_mutex == NULL ||
+        osMutexAcquire(g_alarm_mutex, osWaitForever) != osOK) {
+        printf("[day08][alarm] mutex acquire failed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int Day08_AlarmUnlock(void)
+{
+    if (g_alarm_mutex == NULL ||
+        osMutexRelease(g_alarm_mutex) != osOK) {
+        printf("[day08][alarm] mutex release failed\n");
+        return -1;
+    }
+
+    return 0;
+}
 
 static int Day08_BuzzerInit(void)
 {
@@ -119,9 +158,16 @@ static void Day08_SetBuzzer(int on)
            on ? "ON" : "OFF");
 }
 
-static void Day08_UpdateHumidityAlarm(float humidity)
+static int Day08_UpdateHumidityAlarm(float humidity)
 {
-    int was_silenced = g_alarm_state.humidity_silenced;
+    int was_silenced;
+    int should_buzz;
+
+    if (Day08_AlarmLock() != 0) {
+        return -1;
+    }
+
+    was_silenced = g_alarm_state.humidity_silenced;
 
     Day08Alarm_UpdateHumidity(&g_alarm_state, humidity,
                               DAY08_HUMIDITY_THRESHOLD);
@@ -130,7 +176,14 @@ static void Day08_UpdateHumidityAlarm(float humidity)
                "manual silence cleared\n");
     }
 
-    Day08_SetBuzzer(Day08Alarm_ShouldBuzz(&g_alarm_state));
+    should_buzz = Day08Alarm_ShouldBuzz(&g_alarm_state);
+    Day08_SetBuzzer(should_buzz);
+
+    if (Day08_AlarmUnlock() != 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 /* 2.0change */
@@ -149,6 +202,8 @@ static void Day08_MessageArrived(MessageData *data)
     MQTTMessage *message;
     char payload[DAY08_SUB_PAYLOAD_MAX];
     size_t copy_len;
+    int recognized;
+    int should_buzz;
 
     if (data == NULL || data->message == NULL) {
         return;
@@ -195,9 +250,22 @@ static void Day08_MessageArrived(MessageData *data)
 
     /* 2.0change */
 
-    if (Day08Alarm_ApplyCommand(&g_alarm_state, payload)) {
+    if (Day08_AlarmLock() != 0) {
+        return;
+    }
+
+    recognized = Day08Alarm_ApplyCommand(&g_alarm_state, payload);
+    if (recognized) {
+        should_buzz = Day08Alarm_ShouldBuzz(&g_alarm_state);
+        Day08_SetBuzzer(should_buzz);
+    }
+
+    if (Day08_AlarmUnlock() != 0) {
+        return;
+    }
+
+    if (recognized) {
         printf("[day08][alarm] command applied: %s\n", payload);
-        Day08_SetBuzzer(Day08Alarm_ShouldBuzz(&g_alarm_state));
     } else {
         printf("[day08][sub] unknown command: %s\n",
              payload);
@@ -216,6 +284,11 @@ int Day08_BuildTelemetryJson(char *buf, unsigned int len,
 /* 2.0change */
     int threshold100;
 /* 2.0change */
+    int buzzer_is_on;
+    int manual_alarm_on;
+    int humidity_silenced;
+    int vision_alarm_on;
+
     if (buf == NULL || len == 0U || sample == NULL) {
         return -1;
     }
@@ -234,6 +307,19 @@ int Day08_BuildTelemetryJson(char *buf, unsigned int len,
     }
 
     temp_abs = (temp100 < 0) ? -temp100 : temp100;
+
+    if (Day08_AlarmLock() != 0) {
+        return -1;
+    }
+
+    buzzer_is_on = g_buzzer_is_on;
+    manual_alarm_on = g_alarm_state.manual_alarm_on;
+    humidity_silenced = g_alarm_state.humidity_silenced;
+    vision_alarm_on = g_alarm_state.vision_alarm_on;
+
+    if (Day08_AlarmUnlock() != 0) {
+        return -1;
+    }
 
     /* 2.0change */
 
@@ -280,14 +366,14 @@ int Day08_BuildTelemetryJson(char *buf, unsigned int len,
              temp_abs % 100,
              humi100 / 100,
              humi100 % 100,
-             g_buzzer_is_on,
+             buzzer_is_on,
 /* 2.0change */
             threshold100 / 100,
             threshold100 % 100,
 /* 2.0change */
-             g_alarm_state.manual_alarm_on,
-             g_alarm_state.humidity_silenced,
-             g_alarm_state.vision_alarm_on);
+             manual_alarm_on,
+             humidity_silenced,
+             vision_alarm_on);
 
     /* 2.0change */         
 
@@ -336,7 +422,9 @@ static int Day08_ReadJson(char *json, unsigned int len,
      * 必须先根据最新湿度更新蜂鸣器状态，
      * 再生成JSON，保证上报状态与实际硬件一致。
      */
-    Day08_UpdateHumidityAlarm(sample->humidity_rh);
+    if (Day08_UpdateHumidityAlarm(sample->humidity_rh) != 0) {
+        return -1;
+    }
 
     return Day08_BuildTelemetryJson(
         json,
@@ -351,6 +439,11 @@ void Day08_UartFallbackLoop(void)
 {
     char json[DAY08_JSON_MAX];
     Day08Aht20Data sample;
+
+    if (Day08_AlarmMutexInit() != 0) {
+        printf("[day08] alarm mutex unavailable, UART fallback stopped\n");
+        return;
+    }
 
     printf("[day08] no network / MQTT unavailable, UART fallback\n");
 
@@ -374,6 +467,11 @@ int Day08_MqttLoop(void)
     Day08Aht20Data sample;
     int rc;
     int json_len;
+
+    if (Day08_AlarmMutexInit() != 0) {
+        printf("[day08] alarm mutex unavailable\n");
+        return -1;
+    }
 
     printf("[day08] broker=%s:%d\n",
            DAY08_BROKER_HOST,
@@ -428,7 +526,21 @@ int Day08_MqttLoop(void)
 
     /* 2.0change */
 
-    if (Day08_BuzzerInit() != 0) {
+    if (Day08_AlarmLock() != 0) {
+        free(sendbuf);
+        free(readbuf);
+        return -1;
+    }
+
+    rc = Day08_BuzzerInit();
+
+    if (Day08_AlarmUnlock() != 0) {
+        free(sendbuf);
+        free(readbuf);
+        return -1;
+    }
+
+    if (rc != 0) {
         printf("[day08] buzzer init failed\n");
     }
 
