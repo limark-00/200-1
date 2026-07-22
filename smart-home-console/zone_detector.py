@@ -78,8 +78,9 @@ class ZoneDetector:
             raise TypeError("zone 必须是 NormalizedZone")
         with self._lock:
             self._zone = zone
-            self._state = ZoneState.ARMED
-            self._reset_event_tracking()
+            if self._state not in (ZoneState.ALARM_ACTIVE, ZoneState.ALARM_SILENCED):
+                self._state = ZoneState.ARMED
+                self._reset_event_tracking()
 
     def clear_zone(self) -> int | None:
         with self._lock:
@@ -130,10 +131,15 @@ class ZoneDetector:
                 return self._update(people_in_zone, alarm_cleared=True, event_id=event_id)
             return self._update(people_in_zone)
 
-    def bind_event(self, event_id: int) -> None:
+    def bind_event(self, event_id: int) -> bool:
         with self._lock:
-            if self._state in (ZoneState.ALARM_ACTIVE, ZoneState.ALARM_SILENCED):
+            if (
+                self._state in (ZoneState.ALARM_ACTIVE, ZoneState.ALARM_SILENCED)
+                and self._active_event_id is None
+            ):
                 self._active_event_id = event_id
+                return True
+            return self._active_event_id == event_id
 
     def acknowledge(self, event_id: int) -> bool:
         with self._lock:

@@ -150,6 +150,29 @@ class ZoneDetectorTests(unittest.TestCase):
         self.assertFalse(detector.acknowledge(99))
         self.assertEqual(detector.get_status()["state"], "alarm_active")
 
+    def test_rebinding_a_different_event_id_keeps_original_event(self):
+        clock = FakeClock()
+        detector = armed_detector(clock)
+        start_alarm(detector, clock)
+        detector.bind_event(17)
+
+        self.assertFalse(detector.bind_event(99))
+        self.assertEqual(detector.get_status()["event_id"], 17)
+
+    def test_replacing_zone_while_active_preserves_active_event(self):
+        clock = FakeClock()
+        detector = armed_detector(clock)
+        start_alarm(detector, clock)
+        detector.bind_event(17)
+        replacement = NormalizedZone(0.5, 0.1, 0.3, 0.4)
+
+        detector.set_zone(replacement)
+
+        status = detector.get_status()
+        self.assertEqual(status["state"], "alarm_active")
+        self.assertEqual(status["event_id"], 17)
+        self.assertEqual(status["zone"], replacement)
+
 
 if __name__ == "__main__":
     unittest.main()
