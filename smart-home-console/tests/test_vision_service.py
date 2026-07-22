@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -601,6 +602,67 @@ class VisionServiceTests(unittest.TestCase):
         self.assertEqual(detector.get_status()["state"], "enter_pending")
         self.assertEqual(service.get_status()["enter_elapsed"], 0.0)
 
+    def test_process_frame_after_stop_returns_jpeg_without_publishing(self):
+        service, detector, repository, alarm, _clock, _directory = (
+            self.make_safety_service()
+        )
+        service.stop(timeout=0.0)
+
+        jpeg = service.process_frame(SafetyModel(), FakeFrame())
+
+        # A delayed caller still receives normal encoded bytes for compatibility,
+        # but a stopped service does not publish or advance any safety state.
+        self.assertEqual(jpeg, b"jpeg:frame")
+        self.assertIsNone(service.get_latest_jpeg())
+        self.assertEqual(service.get_status()["frame_sequence"], 0)
+        self.assertEqual(detector.get_status()["state"], "armed")
+        self.assertEqual(repository.list_events(), [])
+        self.assertEqual(alarm.targets, [])
+
+    def test_blocked_prediction_cannot_publish_or_alarm_after_shutdown(self):
+        class BlockingModel:
+            def __init__(self):
+                self.started = threading.Event()
+                self.release = threading.Event()
+
+            def predict(self, frame, **_kwargs):
+                self.started.set()
+                self.release.wait()
+                return [SafetyResult(frame)]
+
+        class FrameCapture(FakeCapture):
+            def read(self):
+                return True, FakeFrame()
+
+        model = BlockingModel()
+        capture = FrameCapture()
+        service, detector, repository, alarm, clock, _directory = (
+            self.make_safety_service(
+                capture_factory=lambda: capture,
+                model_factory=lambda _name: model,
+            )
+        )
+        service.process_frame(SafetyModel(), FakeFrame())
+        clock.advance(2.0)
+        baseline_sequence = service.get_status()["frame_sequence"]
+
+        service.start()
+        self.assertTrue(model.started.wait(1.0))
+        service.stop(timeout=0.01)
+        service.shutdown_safety()
+        model.release.set()
+        service.stop(timeout=1.0)
+
+        self.assertEqual(detector.get_status()["state"], "enter_pending")
+        self.assertEqual(repository.list_events(), [])
+        self.assertNotIn((True, None), alarm.targets)
+        self.assertEqual(alarm.targets, [(False, None)])
+        self.assertEqual(
+            service.get_status()["frame_sequence"],
+            baseline_sequence,
+        )
+        self.assertTrue(capture.released)
+
     def test_delete_active_zone_closes_event_and_turns_alarm_off(self):
         service, detector, repository, alarm, _clock, _directory = (
             self.active_safety_service()
@@ -785,14 +847,12 @@ class VisionServiceTests(unittest.TestCase):
         )
         event_id = repository.list_events()[0]["id"]
         log.clear()
-        service.stop = lambda timeout=3.0: log.append(("service.stop", timeout))
 
         service.shutdown_safety()
 
         self.assertEqual(
             log,
             [
-                ("service.stop", 3.0),
                 ("repo.close", event_id, "server_shutdown"),
                 ("alarm.set", False, event_id, True),
                 ("alarm.wait", 3.0),

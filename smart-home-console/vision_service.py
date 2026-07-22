@@ -236,13 +236,14 @@ class VisionService:
             people_count = 0
             annotated = frame
 
-        processing_error = ""
-        if self._zone_detector is None:
-            jpeg = self._frame_encoder(annotated, self.settings.jpeg_quality)
-        else:
-            height, width = frame.shape[:2]
-            foot_points = extract_foot_points(boxes, width, height)
-            with self._safety_lock:
+        with self._safety_lock:
+            if self._stop_event.is_set():
+                return self._frame_encoder(annotated, self.settings.jpeg_quality)
+
+            processing_error = ""
+            if self._zone_detector is not None:
+                height, width = frame.shape[:2]
+                foot_points = extract_foot_points(boxes, width, height)
                 previous_state = self._zone_detector.get_status()["state"]
                 update = self._zone_detector.update(foot_points)
                 self._update_safety_timers(previous_state, update)
@@ -252,25 +253,26 @@ class VisionService:
                     detector_status["zone"],
                     update.state,
                 )
-                jpeg = self._frame_encoder(annotated, self.settings.jpeg_quality)
+            jpeg = self._frame_encoder(annotated, self.settings.jpeg_quality)
+            if self._zone_detector is not None:
                 processing_error = self._coordinate_zone_update(update, jpeg)
 
-        now = time.monotonic()
+            now = time.monotonic()
 
-        with self._frame_ready:
-            if self._last_frame_time is not None and now > self._last_frame_time:
-                instant_fps = 1.0 / (now - self._last_frame_time)
-                self._fps = (
-                    instant_fps
-                    if self._fps == 0.0
-                    else self._fps * 0.8 + instant_fps * 0.2
-                )
-            self._last_frame_time = now
-            self._latest_jpeg = jpeg
-            self._people_count = people_count
-            self._frame_sequence += 1
-            self._last_error = processing_error
-            self._frame_ready.notify_all()
+            with self._frame_ready:
+                if self._last_frame_time is not None and now > self._last_frame_time:
+                    instant_fps = 1.0 / (now - self._last_frame_time)
+                    self._fps = (
+                        instant_fps
+                        if self._fps == 0.0
+                        else self._fps * 0.8 + instant_fps * 0.2
+                    )
+                self._last_frame_time = now
+                self._latest_jpeg = jpeg
+                self._people_count = people_count
+                self._frame_sequence += 1
+                self._last_error = processing_error
+                self._frame_ready.notify_all()
 
         return jpeg
 
@@ -611,6 +613,8 @@ class VisionService:
                         ok, frame = capture.read()
                         if not ok or frame is None:
                             raise RuntimeError("摄像头读取画面失败")
+                        if self._stop_event.is_set():
+                            break
 
                         frame_number += 1
                         if (frame_number - 1) % self.settings.frame_skip != 0:
