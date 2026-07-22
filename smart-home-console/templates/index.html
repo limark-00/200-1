@@ -286,6 +286,7 @@
       color: #ffffff;
       background: rgba(12, 28, 42, 0.72);
       font-size: 12px;
+      pointer-events: none;
     }
 
     .vision-sidebar {
@@ -1090,6 +1091,8 @@
     let visionDragStart = null;
     let previousZoneState;
     let previousActiveEventId;
+    let visionEventRefreshPromise = null;
+    let visionEventRefreshQueued = false;
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -1454,6 +1457,11 @@
       };
     }
 
+    function visionImageReady() {
+      const image = document.getElementById("visionStream");
+      return image.naturalWidth > 0 && image.naturalHeight > 0;
+    }
+
     function imageContentRect() {
       const image = document.getElementById("visionStream");
       const elementWidth = image.clientWidth;
@@ -1464,14 +1472,13 @@
       if (
         elementWidth <= 0 ||
         elementHeight <= 0 ||
-        naturalWidth <= 0 ||
-        naturalHeight <= 0
+        !visionImageReady()
       ) {
         return {
           left: 0,
           top: 0,
-          width: elementWidth,
-          height: elementHeight
+          width: 0,
+          height: 0
         };
       }
 
@@ -1549,6 +1556,10 @@
       const canvas = document.getElementById("visionZoneCanvas");
       const canvasRect = canvas.getBoundingClientRect();
       const contentRect = imageContentRect();
+      if (contentRect.width <= 0 || contentRect.height <= 0) {
+        return null;
+      }
+
       const x = event.clientX - canvasRect.left;
       const y = event.clientY - canvasRect.top;
       const inside =
@@ -1808,20 +1819,39 @@
       });
     }
 
-    async function refreshVisionEvents() {
-      try {
-        const response = await fetch("/api/vision/events", {
-          cache: "no-store"
-        });
-        const result = await readVisionResponse(
-          response,
-          "读取告警事件失败"
-        );
-        renderVisionEvents(result.events);
-      } catch (error) {
-        document.getElementById("visionEventList").innerHTML =
-          `<p class="vision-event-empty">${escapeHtml(error.message)}</p>`;
+    function refreshVisionEvents() {
+      if (visionEventRefreshPromise) {
+        visionEventRefreshQueued = true;
+        return visionEventRefreshPromise;
       }
+
+      visionEventRefreshPromise = Promise.resolve()
+        .then(async () => {
+          try {
+            const response = await fetch("/api/vision/events", {
+              cache: "no-store"
+            });
+            const result = await readVisionResponse(
+              response,
+              "读取告警事件失败"
+            );
+            renderVisionEvents(result.events);
+          } catch (error) {
+            document.getElementById("visionEventList").innerHTML =
+              `<p class="vision-event-empty">${escapeHtml(error.message)}</p>`;
+          }
+        })
+        .finally(() => {
+          const rerunRequested = visionEventRefreshQueued;
+          visionEventRefreshQueued = false;
+          visionEventRefreshPromise = null;
+
+          if (rerunRequested) {
+            refreshVisionEvents();
+          }
+        });
+
+      return visionEventRefreshPromise;
     }
 
     async function acknowledgeActiveVisionEvent() {
@@ -1988,6 +2018,15 @@
         return;
       }
 
+      if (!visionImageReady()) {
+        visionDragStart = null;
+        draftVisionZone = null;
+        document.getElementById("visionZoneSaveButton").disabled = true;
+        document.getElementById("visionZoneMessage").textContent =
+          "实时画面尚未加载，请稍后再试。";
+        return;
+      }
+
       const position = visionPointerPosition(event, true);
       if (!position) {
         document.getElementById("visionZoneMessage").textContent =
@@ -2004,6 +2043,16 @@
 
     function updateVisionZoneDrag(event) {
       if (!visionZoneEditing || !visionDragStart) {
+        return;
+      }
+
+      if (!visionImageReady()) {
+        visionDragStart = null;
+        draftVisionZone = null;
+        document.getElementById("visionZoneSaveButton").disabled = true;
+        document.getElementById("visionZoneMessage").textContent =
+          "实时画面尚未加载，请稍后再试。";
+        drawVisionZone();
         return;
       }
 

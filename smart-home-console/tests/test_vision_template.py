@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import unittest
 
 
@@ -55,6 +56,33 @@ class VisionTemplateTests(unittest.TestCase):
         self.assertIn('fetch("/api/vision/events"', self.html)
         self.assertIn("function imageContentRect()", self.html)
         self.assertIn("function normalizedZoneFromDrag", self.html)
+
+    def test_event_refresh_is_single_flight_with_one_queued_rerun(self):
+        self.assertIn("let visionEventRefreshPromise = null;", self.html)
+        self.assertIn("let visionEventRefreshQueued = false;", self.html)
+        self.assertIn("if (visionEventRefreshPromise)", self.html)
+        self.assertIn("visionEventRefreshQueued = true;", self.html)
+        self.assertIn(
+            "const rerunRequested = visionEventRefreshQueued;",
+            self.html,
+        )
+        self.assertIn("if (rerunRequested)", self.html)
+
+    def test_zone_drag_waits_for_natural_image_dimensions(self):
+        self.assertIn("function visionImageReady()", self.html)
+        self.assertIn("image.naturalWidth > 0", self.html)
+        self.assertIn("image.naturalHeight > 0", self.html)
+        self.assertIn("if (!visionImageReady())", self.html)
+        self.assertIn("实时画面尚未加载，请稍后再试。", self.html)
+
+    def test_live_label_does_not_intercept_canvas_pointer_events(self):
+        self.assertRegex(
+            self.html,
+            re.compile(
+                r"\.vision-frame-label\s*\{[^}]*pointer-events:\s*none;",
+                re.DOTALL,
+            ),
+        )
 
 
 if __name__ == "__main__":
