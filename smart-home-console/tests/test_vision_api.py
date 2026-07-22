@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -127,6 +128,46 @@ class FakeVisionService:
 class VisionApiTests(unittest.TestCase):
     def open_client(self, fake: FakeVisionService):
         return patch.object(app_module, "vision_service", fake, create=True)
+
+    def probe_static_routes(self, configured_directory, urls):
+        environment = os.environ.copy()
+        environment["VISION_EVENT_DIR"] = configured_directory
+        environment["VISION_STATIC_PROBE_URLS"] = json.dumps(urls)
+        script = """
+import asyncio
+import json
+import os
+
+import httpx
+import app
+
+
+async def main():
+    transport = httpx.ASGITransport(app=app.app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://testserver",
+    ) as client:
+        statuses = [
+            (await client.get(url)).status_code
+            for url in json.loads(os.environ["VISION_STATIC_PROBE_URLS"])
+        ]
+    print(json.dumps({"statuses": statuses}))
+
+
+asyncio.run(main())
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=PROJECT_DIR,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0)
+        return json.loads(completed.stdout.strip().splitlines()[-1])
 
     def test_status_endpoint_returns_vision_state(self):
         fake = FakeVisionService()
@@ -300,6 +341,7 @@ class VisionApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"configured-jpeg")
         self.assertEqual(resolved, os.path.realpath(directory))
+        self.assertEqual(app_module.event_static_subtree(resolved), "")
         self.assertNotIn(directory, response.text)
 
     def test_empty_and_console_root_event_directories_do_not_serve_source(self):
@@ -355,6 +397,194 @@ class VisionApiTests(unittest.TestCase):
             response = client.get("/static/vision_events/.gitkeep")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_default_event_subtree_is_dedicated_only(self):
+        default_directory = os.path.join(
+            app_module.STATIC_DIR,
+            "vision_events",
+        )
+        with tempfile.NamedTemporaryFile(
+            dir=default_directory,
+            suffix=".jpg",
+        ) as evidence:
+            evidence.write(b"default evidence")
+            evidence.flush()
+            filename = os.path.basename(evidence.name)
+
+            result = self.probe_static_routes(
+                "static/vision_events",
+                [
+                    f"/vision-events/{filename}",
+                    f"/static/vision_events/{filename}",
+                    "/vision-events/config.py",
+                    "/static/style.css",
+                ],
+            )
+
+        self.assertEqual(result["statuses"], [200, 404, 404, 200])
+        self.assertEqual(
+            app_module.event_static_subtree(default_directory),
+            "vision_events",
+        )
+
+    def test_static_captures_override_blocks_its_complete_subtree(self):
+        captures_directory = os.path.join(app_module.STATIC_DIR, "captures")
+        with tempfile.NamedTemporaryFile(
+            dir=captures_directory,
+            suffix=".jpg",
+        ) as evidence:
+            evidence.write(b"capture evidence")
+            evidence.flush()
+            filename = os.path.basename(evidence.name)
+
+            result = self.probe_static_routes(
+                "static/captures",
+                [
+                    f"/vision-events/{filename}",
+                    f"/static/captures/{filename}",
+                    "/vision-events/config.py",
+                    "/static/style.css",
+                ],
+            )
+
+        self.assertEqual(result["statuses"], [200, 404, 404, 200])
+
+    def test_nested_static_override_and_symlink_block_only_resolved_subtree(self):
+        with tempfile.TemporaryDirectory(dir=app_module.STATIC_DIR) as temporary:
+            event_directory = os.path.join(temporary, "custom", "evidence")
+            sibling_directory = os.path.join(
+                temporary,
+                "custom",
+                "evidence-sibling",
+            )
+            os.makedirs(event_directory)
+            os.makedirs(sibling_directory)
+            os.makedirs(os.path.join(temporary, "custom", "decoy"))
+            event_filename = "nested-event.jpg"
+            sibling_filename = "sibling.txt"
+            with open(os.path.join(event_directory, event_filename), "wb") as file:
+                file.write(b"nested evidence")
+            with open(os.path.join(sibling_directory, sibling_filename), "wb") as file:
+                file.write(b"normal static sibling")
+            event_relative = os.path.relpath(
+                event_directory,
+                app_module.BASE_DIR,
+            )
+            event_static_url = os.path.relpath(
+                event_directory,
+                app_module.STATIC_DIR,
+            ).replace(os.sep, "/")
+            sibling_static_url = os.path.relpath(
+                sibling_directory,
+                app_module.STATIC_DIR,
+            ).replace(os.sep, "/")
+            symlink = os.path.join(temporary, "event-directory-link")
+            os.symlink(event_directory, symlink)
+            static_alias = os.path.join(
+                temporary,
+                "custom",
+                "evidence-alias",
+            )
+            os.symlink(event_directory, static_alias)
+            static_alias_url = os.path.relpath(
+                static_alias,
+                app_module.STATIC_DIR,
+            ).replace(os.sep, "/")
+            traversal_url = (
+                os.path.relpath(
+                    os.path.join(temporary, "custom", "decoy"),
+                    app_module.STATIC_DIR,
+                ).replace(os.sep, "/")
+                + "/%2e%2e/evidence/"
+                + event_filename
+            )
+
+            urls = [
+                f"/vision-events/{event_filename}",
+                f"/static/{event_static_url}/{event_filename}",
+                f"/static/{event_static_url}",
+                f"/static/{static_alias_url}/{event_filename}",
+                f"/static/{traversal_url}",
+                f"/static/{sibling_static_url}/{sibling_filename}",
+                "/vision-events/config.py",
+                "/static/style.css",
+            ]
+            direct = self.probe_static_routes(event_relative, urls)
+            via_symlink = self.probe_static_routes(symlink, urls)
+
+        expected = [200, 404, 404, 404, 404, 200, 404, 200]
+        self.assertEqual(direct["statuses"], expected)
+        self.assertEqual(via_symlink["statuses"], expected)
+
+    def test_static_prefix_does_not_block_case_distinct_sibling(self):
+        with tempfile.TemporaryDirectory(dir=app_module.STATIC_DIR) as temporary:
+            event_directory = os.path.join(temporary, "evidence")
+            case_sibling = os.path.join(temporary, "EVIDENCE")
+            os.makedirs(event_directory)
+            configured = os.path.relpath(event_directory, app_module.BASE_DIR)
+            sibling_url = os.path.relpath(
+                case_sibling,
+                app_module.STATIC_DIR,
+            ).replace(os.sep, "/")
+            if os.path.exists(case_sibling):
+                self.assertTrue(os.path.samefile(event_directory, case_sibling))
+                filename = "case-variant.jpg"
+                with open(os.path.join(event_directory, filename), "wb") as file:
+                    file.write(b"same evidence directory")
+                result = self.probe_static_routes(
+                    configured,
+                    [f"/static/{sibling_url}/{filename}"],
+                )
+                self.assertEqual(result["statuses"], [404])
+                return
+
+            os.makedirs(case_sibling)
+            sibling_filename = "case-sibling.txt"
+            with open(os.path.join(case_sibling, sibling_filename), "wb") as file:
+                file.write(b"case-distinct sibling")
+            result = self.probe_static_routes(
+                configured,
+                [f"/static/{sibling_url}/{sibling_filename}"],
+            )
+
+        self.assertEqual(result["statuses"], [200])
+
+    def test_static_root_and_symlink_to_static_root_fall_back_safely(self):
+        safe_default = os.path.realpath(
+            os.path.join(app_module.STATIC_DIR, "vision_events")
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            static_symlink = os.path.join(temporary, "static-link")
+            os.symlink(app_module.STATIC_DIR, static_symlink)
+
+            for configured in (app_module.STATIC_DIR, static_symlink):
+                with self.subTest(configured=configured):
+                    resolved, warning = (
+                        app_module.resolve_vision_event_directory(configured)
+                    )
+                    self.assertEqual(resolved, safe_default)
+                    self.assertEqual(
+                        warning,
+                        app_module.VISION_EVENT_DIRECTORY_WARNING_TEXT,
+                    )
+
+    def test_external_event_directory_needs_no_static_exclusion(self):
+        with tempfile.TemporaryDirectory() as event_directory:
+            event_filename = "external-event.jpg"
+            with open(os.path.join(event_directory, event_filename), "wb") as file:
+                file.write(b"external evidence")
+
+            result = self.probe_static_routes(
+                event_directory,
+                [
+                    f"/vision-events/{event_filename}",
+                    "/static/style.css",
+                    "/static/vision_events/.gitkeep",
+                ],
+            )
+
+        self.assertEqual(result["statuses"], [200, 200, 200])
+        self.assertEqual(app_module.event_static_subtree(event_directory), "")
 
     def test_inaccessible_event_directory_is_fail_soft_not_unauthorized(self):
         with tempfile.TemporaryDirectory() as directory:

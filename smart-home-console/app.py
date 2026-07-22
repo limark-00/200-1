@@ -83,16 +83,36 @@ def resolve_vision_event_directory(directory: str) -> tuple[str, str]:
     configured = str(directory or "").strip() or DEFAULT_VISION_EVENT_DIR
     try:
         resolved = os.path.realpath(_project_path(configured))
-        common = os.path.commonpath([resolved, BASE_DIR])
+        resolved_base = os.path.realpath(BASE_DIR)
+        resolved_static = os.path.realpath(STATIC_DIR)
+        common = os.path.commonpath([resolved, resolved_base])
         contains_console = common == resolved
         filesystem_root = os.path.dirname(resolved) == resolved
+        is_static_root = resolved == resolved_static
         file_collision = os.path.exists(resolved) and not os.path.isdir(resolved)
     except (OSError, TypeError, ValueError):
         return safe_default, VISION_EVENT_DIRECTORY_WARNING_TEXT
 
-    if contains_console or filesystem_root or file_collision:
+    if contains_console or filesystem_root or is_static_root or file_collision:
         return safe_default, VISION_EVENT_DIRECTORY_WARNING_TEXT
     return resolved, ""
+
+
+def event_static_subtree(directory: str) -> str:
+    """Return the normalized static-relative event prefix, if there is one."""
+    try:
+        resolved_static = os.path.realpath(STATIC_DIR)
+        resolved_event = os.path.realpath(directory)
+        if (
+            resolved_event == resolved_static
+            or os.path.commonpath([resolved_event, resolved_static])
+            != resolved_static
+        ):
+            return ""
+        relative = os.path.relpath(resolved_event, resolved_static)
+    except (OSError, TypeError, ValueError):
+        return ""
+    return relative.replace("\\", "/").strip("/")
 
 
 class VisionEvidenceFiles(StaticFiles):
@@ -121,10 +141,83 @@ class VisionEvidenceFiles(StaticFiles):
 class ConsoleStaticFiles(StaticFiles):
     """Serve console assets without exposing the evidence storage subtree."""
 
+    def __init__(self, *, blocked_subtree: str = "", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        normalized = os.path.normcase(os.path.normpath(blocked_subtree or ""))
+        self._blocked_subtree = (
+            ""
+            if normalized in {"", "."}
+            else normalized.replace("\\", "/").strip("/")
+        )
+        self._blocked_path = (
+            os.path.normcase(
+                os.path.realpath(
+                    os.path.join(
+                        os.fspath(self.directory),
+                        self._blocked_subtree,
+                    )
+                )
+            )
+            if self._blocked_subtree and self.directory is not None
+            else ""
+        )
+        self._static_root_path = (
+            os.path.normcase(os.path.realpath(os.fspath(self.directory)))
+            if self.directory is not None
+            else ""
+        )
+
+    def lookup_path(self, path: str) -> tuple[str, os.stat_result | None]:
+        full_path, stat_result = super().lookup_path(path)
+        if full_path and self._is_blocked_path(full_path):
+            return "", None
+        return full_path, stat_result
+
+    def _is_blocked_path(self, path: str) -> bool:
+        if not self._blocked_path:
+            return False
+        try:
+            resolved = os.path.normcase(os.path.realpath(path))
+            if (
+                os.path.commonpath([resolved, self._blocked_path])
+                == self._blocked_path
+            ):
+                return True
+        except (OSError, TypeError, ValueError):
+            return False
+
+        # ``normcase`` follows operating-system path rules, but macOS may use
+        # a case-insensitive filesystem while retaining POSIX string casing.
+        # Compare existing ancestors by identity so aliases/case variants
+        # cannot reach the blocked directory without overblocking distinct
+        # siblings on case-sensitive filesystems.
+        candidate = resolved
+        while True:
+            try:
+                if os.path.samefile(candidate, self._blocked_path):
+                    return True
+            except (OSError, ValueError):
+                pass
+            try:
+                if self._static_root_path and os.path.samefile(
+                    candidate,
+                    self._static_root_path,
+                ):
+                    return False
+            except (OSError, ValueError):
+                pass
+            parent = os.path.dirname(candidate)
+            if parent == candidate:
+                return False
+            candidate = parent
+
     async def get_response(self, path: str, scope: dict[str, Any]) -> Response:
-        normalized = path.replace("\\", "/").lstrip("/")
-        first_segment = normalized.split("/", 1)[0].casefold()
-        if first_segment == "vision_events":
+        normalized = os.path.normcase(os.path.normpath(path))
+        normalized = normalized.replace("\\", "/").strip("/")
+        if self._blocked_subtree and (
+            normalized == self._blocked_subtree
+            or normalized.startswith(f"{self._blocked_subtree}/")
+        ):
             raise StarletteHTTPException(status_code=404)
         return await super().get_response(path, scope)
 
@@ -150,6 +243,7 @@ def mount_vision_event_files(application: FastAPI, directory: str) -> str:
 VISION_EVENT_DIRECTORY, VISION_EVENT_DIRECTORY_WARNING = (
     resolve_vision_event_directory(config.VISION_EVENT_DIR)
 )
+VISION_EVENT_STATIC_SUBTREE = event_static_subtree(VISION_EVENT_DIRECTORY)
 event_repository = EventRepository(_project_path(config.VISION_DB_PATH))
 zone_detector = ZoneDetector(
     config.VISION_ENTER_SECONDS,
@@ -335,7 +429,14 @@ templates.env.filters["tojson"] = _tojson
 # 注意：mount 要写在具体路由之后也可以，但 /static 不会和 /api 冲突
 os.makedirs(os.path.join(STATIC_DIR, "captures"), exist_ok=True)
 _mount_resolved_vision_event_files(app, VISION_EVENT_DIRECTORY)
-app.mount("/static", ConsoleStaticFiles(directory=STATIC_DIR), name="static")
+app.mount(
+    "/static",
+    ConsoleStaticFiles(
+        directory=STATIC_DIR,
+        blocked_subtree=VISION_EVENT_STATIC_SUBTREE,
+    ),
+    name="static",
+)
 
 
 # ---------- 请求体模型（Pydantic：自动校验 + /docs 里能看到字段说明）----------
