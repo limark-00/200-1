@@ -500,6 +500,26 @@ class VisionServiceTests(unittest.TestCase):
         self.assertIn("not-a-directory", event["last_error"])
         self.assertEqual(alarm.targets, [(True, event["id"])])
 
+    def test_successful_alarm_delivery_preserves_snapshot_failure_error(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        blocked_path = os.path.join(temporary.name, "not-a-directory")
+        with open(blocked_path, "wb") as file:
+            file.write(b"block directory creation")
+        service, _detector, repository, _alarm, clock, _directory = (
+            self.make_safety_service(event_snapshot_dir=blocked_path)
+        )
+        service.process_frame(SafetyModel(), FakeFrame())
+        clock.advance(2.0)
+        service.process_frame(SafetyModel(), FakeFrame())
+        event_id = repository.list_events()[0]["id"]
+
+        repository.mark_delivery(event_id, "vision_alarm_on", True, "")
+
+        event = repository.get_event(event_id)
+        self.assertTrue(event["alarm_on_delivered"])
+        self.assertIn("not-a-directory", event["last_error"])
+
     def test_event_creation_failure_does_not_bind_fake_id_but_still_alarms(self):
         class CreateFailingRepository(EventRepository):
             def create_event(self, snapshot_filename, people_count):
@@ -523,7 +543,7 @@ class VisionServiceTests(unittest.TestCase):
 
     def test_snapshot_error_update_failure_keeps_created_event_id(self):
         class ErrorUpdateFailingRepository(EventRepository):
-            def mark_delivery(self, event_id, command, delivered, error_text):
+            def record_error(self, event_id, error_text):
                 raise OSError("error update failed")
 
         temporary = tempfile.TemporaryDirectory()

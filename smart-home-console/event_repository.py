@@ -180,6 +180,21 @@ class EventRepository:
         finally:
             connection.close()
 
+    def record_error(self, event_id: int, error_text: str) -> dict:
+        if not isinstance(error_text, str) or not error_text.strip():
+            raise ValueError("error text must be nonempty")
+        connection = self._connect()
+        try:
+            self._fetch_event(connection, event_id)
+            connection.execute(
+                "UPDATE vision_events SET last_error = ? WHERE id = ?",
+                (error_text, event_id),
+            )
+            connection.commit()
+            return self._fetch_event(connection, event_id)
+        finally:
+            connection.close()
+
     def mark_delivery(
         self, event_id: int, command: str, delivered: bool, error_text: str
     ) -> dict:
@@ -192,10 +207,17 @@ class EventRepository:
         connection = self._connect()
         try:
             self._fetch_event(connection, event_id)
-            connection.execute(
-                f"UPDATE vision_events SET {delivery_column} = ?, last_error = ? WHERE id = ?",
-                (int(delivered), error_text, event_id),
-            )
+            if error_text:
+                connection.execute(
+                    f"UPDATE vision_events SET {delivery_column} = ?, "
+                    "last_error = ? WHERE id = ?",
+                    (int(delivered), error_text, event_id),
+                )
+            else:
+                connection.execute(
+                    f"UPDATE vision_events SET {delivery_column} = ? WHERE id = ?",
+                    (int(delivered), event_id),
+                )
             connection.commit()
             return self._fetch_event(connection, event_id)
         finally:

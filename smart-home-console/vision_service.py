@@ -476,10 +476,8 @@ class VisionService:
                     event_id = None
                 if event_id is not None and snapshot_error:
                     try:
-                        self._event_repository.mark_delivery(
+                        self._event_repository.record_error(
                             event_id,
-                            "vision_alarm_on",
-                            False,
                             snapshot_error,
                         )
                     except Exception as exc:

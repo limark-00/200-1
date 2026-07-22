@@ -93,6 +93,7 @@ class EventRepositoryTests(unittest.TestCase):
             lambda: self.repo.update_max_people(999, 2),
             lambda: self.repo.acknowledge_event(999),
             lambda: self.repo.close_event(999, "person_left"),
+            lambda: self.repo.record_error(999, "missing event"),
             lambda: self.repo.mark_delivery(999, "vision_alarm_on", True, ""),
         ):
             with self.subTest(operation=operation):
@@ -116,6 +117,7 @@ class EventRepositoryTests(unittest.TestCase):
 
     def test_delivery_failure_stores_final_error_text(self):
         event_id = self.repo.create_event("", 1)
+        self.repo.record_error(event_id, "snapshot write failed")
 
         delivered = self.repo.mark_delivery(
             event_id, "vision_alarm_off", False, "broker unavailable"
@@ -124,6 +126,49 @@ class EventRepositoryTests(unittest.TestCase):
         self.assertFalse(delivered["alarm_off_delivered"])
         self.assertEqual(delivered["last_error"], "broker unavailable")
         self.assertEqual(delivered["snapshot_filename"], "")
+
+    def test_successful_delivery_preserves_existing_event_error(self):
+        event_id = self.repo.create_event("", 1)
+        self.repo.record_error(event_id, "snapshot write failed")
+
+        delivered = self.repo.mark_delivery(
+            event_id, "vision_alarm_on", True, ""
+        )
+
+        self.assertTrue(delivered["alarm_on_delivered"])
+        self.assertEqual(delivered["last_error"], "snapshot write failed")
+
+    def test_record_error_rejects_empty_text(self):
+        event_id = self.repo.create_event("event.jpg", 1)
+
+        for error_text in ("", "   "):
+            with self.subTest(error_text=error_text):
+                with self.assertRaises(ValueError):
+                    self.repo.record_error(event_id, error_text)
+
+        self.assertEqual(self.repo.get_event(event_id)["last_error"], "")
+
+    def test_record_error_preserves_event_lifecycle_and_delivery_fields(self):
+        event_id = self.repo.create_event("event.jpg", 2)
+        self.repo.mark_delivery(event_id, "vision_alarm_on", True, "")
+        self.repo.acknowledge_event(event_id)
+        before = self.repo.close_event(event_id, "person_left")
+
+        recorded = self.repo.record_error(event_id, "snapshot metadata failed")
+
+        for field in (
+            "started_at",
+            "ended_at",
+            "snapshot_filename",
+            "max_people",
+            "acknowledged_at",
+            "close_reason",
+            "alarm_on_delivered",
+            "alarm_off_delivered",
+        ):
+            with self.subTest(field=field):
+                self.assertEqual(recorded[field], before[field])
+        self.assertEqual(recorded["last_error"], "snapshot metadata failed")
 
     def test_create_event_accepts_empty_and_basename_snapshot_filenames(self):
         empty_id = self.repo.create_event("", 1)
