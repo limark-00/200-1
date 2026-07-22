@@ -107,6 +107,7 @@ class EventRepository:
             connection.close()
 
     def create_event(self, snapshot_filename: str, people_count: int) -> int:
+        self._validate_snapshot_filename(snapshot_filename)
         connection = self._connect()
         try:
             cursor = connection.execute(
@@ -236,6 +237,17 @@ class EventRepository:
     @staticmethod
     def _utc_now() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _validate_snapshot_filename(snapshot_filename: str) -> None:
+        if not isinstance(snapshot_filename, str):
+            raise ValueError("snapshot filename must be a string")
+        if snapshot_filename and (
+            snapshot_filename in {".", ".."}
+            or "/" in snapshot_filename
+            or "\\" in snapshot_filename
+        ):
+            raise ValueError("snapshot filename must be a plain basename")
 
     def _fetch_event(self, connection: sqlite3.Connection, event_id: int) -> dict:
         row = connection.execute(

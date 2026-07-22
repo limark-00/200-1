@@ -125,6 +125,28 @@ class EventRepositoryTests(unittest.TestCase):
         self.assertEqual(delivered["last_error"], "broker unavailable")
         self.assertEqual(delivered["snapshot_filename"], "")
 
+    def test_create_event_accepts_empty_and_basename_snapshot_filenames(self):
+        empty_id = self.repo.create_event("", 1)
+        filename_id = self.repo.create_event("event.jpg", 1)
+
+        self.assertEqual(self.repo.get_event(empty_id)["snapshot_filename"], "")
+        self.assertEqual(
+            self.repo.get_event(filename_id)["snapshot_filename"], "event.jpg"
+        )
+
+    def test_create_event_rejects_non_basename_snapshot_filenames(self):
+        for filename in (
+            "/tmp/event.jpg",
+            "nested/event.jpg",
+            "nested\\event.jpg",
+            ".",
+            "..",
+        ):
+            with self.subTest(filename=filename):
+                with self.assertRaises(ValueError):
+                    self.repo.create_event(filename, 1)
+                self.assertEqual(self.repo.list_events(), [])
+
     def test_event_timestamps_are_timezone_aware_utc_iso_strings(self):
         event_id = self.repo.create_event("event.jpg", 1)
         event = self.repo.close_event(event_id, "person_left")
