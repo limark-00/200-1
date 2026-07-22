@@ -1096,6 +1096,11 @@
     let visionDragStart = null;
     let previousZoneState;
     let previousActiveEventId;
+    let visionMutationRevision = 0;
+    let visionStatusRefreshPromise = null;
+    let visionStatusRefreshQueued = false;
+    let visionZoneRefreshPromise = null;
+    let visionZoneRefreshQueued = false;
     let visionEventRefreshPromise = null;
     let visionEventRefreshQueued = false;
 
@@ -1656,25 +1661,53 @@
       drawVisionZone();
     }
 
-    async function refreshVisionZone() {
-      try {
-        const response = await fetch("/api/vision/zone", {
-          cache: "no-store"
-        });
-        const result = await readVisionResponse(
-          response,
-          "读取危险区域失败"
-        );
-        savedVisionZone = copyNormalizedZone(result.zone);
-        if (!visionZoneEditing) {
-          document.getElementById("visionZoneDeleteButton").disabled =
-            !savedVisionZone;
-          drawVisionZone();
-        }
-      } catch (error) {
-        document.getElementById("visionZoneMessage").textContent =
-          error.message;
+    function refreshVisionZone() {
+      if (visionZoneRefreshPromise) {
+        visionZoneRefreshQueued = true;
+        return visionZoneRefreshPromise;
       }
+
+      const requestRevision = visionMutationRevision;
+      visionZoneRefreshPromise = Promise.resolve()
+        .then(async () => {
+          try {
+            const response = await fetch("/api/vision/zone", {
+              cache: "no-store"
+            });
+            const result = await readVisionResponse(
+              response,
+              "读取危险区域失败"
+            );
+            if (requestRevision !== visionMutationRevision) {
+              return;
+            }
+            savedVisionZone = copyNormalizedZone(result.zone);
+            if (!visionZoneEditing) {
+              document.getElementById("visionZoneDeleteButton").disabled =
+                !savedVisionZone;
+              drawVisionZone();
+            }
+          } catch (error) {
+            if (requestRevision !== visionMutationRevision) {
+              return;
+            }
+            document.getElementById("visionZoneMessage").textContent =
+              error.message;
+          }
+        })
+        .finally(() => {
+          const rerunRequested =
+            visionZoneRefreshQueued ||
+            requestRevision !== visionMutationRevision;
+          visionZoneRefreshQueued = false;
+          visionZoneRefreshPromise = null;
+
+          if (rerunRequested) {
+            return refreshVisionZone();
+          }
+        });
+
+      return visionZoneRefreshPromise;
     }
 
     async function saveVisionZone() {
@@ -1695,11 +1728,13 @@
           response,
           "保存危险区域失败"
         );
+        visionMutationRevision += 1;
         savedVisionZone = copyNormalizedZone(result.zone);
         setVisionZoneEditor(false);
         document.getElementById("visionZoneMessage").textContent =
           "危险区域已保存";
         await Promise.all([
+          refreshVisionZone(),
           refreshVisionStatus(),
           refreshVisionEvents()
         ]);
@@ -1720,11 +1755,13 @@
           method: "DELETE"
         });
         await readVisionResponse(response, "删除危险区域失败");
+        visionMutationRevision += 1;
         savedVisionZone = null;
         setVisionZoneEditor(false);
         document.getElementById("visionZoneMessage").textContent =
           "危险区域已删除";
         await Promise.all([
+          refreshVisionZone(),
           refreshVisionStatus(),
           refreshVisionEvents()
         ]);
@@ -1835,6 +1872,7 @@
         return visionEventRefreshPromise;
       }
 
+      const requestRevision = visionMutationRevision;
       visionEventRefreshPromise = Promise.resolve()
         .then(async () => {
           try {
@@ -1845,19 +1883,27 @@
               response,
               "读取告警事件失败"
             );
+            if (requestRevision !== visionMutationRevision) {
+              return;
+            }
             renderVisionEvents(result.events);
           } catch (error) {
+            if (requestRevision !== visionMutationRevision) {
+              return;
+            }
             document.getElementById("visionEventList").innerHTML =
               `<p class="vision-event-empty">${escapeHtml(error.message)}</p>`;
           }
         })
         .finally(() => {
-          const rerunRequested = visionEventRefreshQueued;
+          const rerunRequested =
+            visionEventRefreshQueued ||
+            requestRevision !== visionMutationRevision;
           visionEventRefreshQueued = false;
           visionEventRefreshPromise = null;
 
           if (rerunRequested) {
-            refreshVisionEvents();
+            return refreshVisionEvents();
           }
         });
 
@@ -1873,6 +1919,7 @@
           method: "POST"
         });
         await readVisionResponse(response, "确认告警失败");
+        visionMutationRevision += 1;
         await Promise.all([
           refreshVisionStatus(),
           refreshVisionEvents()
@@ -1993,26 +2040,54 @@
       }
     }
 
-    async function refreshVisionStatus() {
-      try {
-        const response = await fetch("/api/vision/status", {
-          cache: "no-store"
-        });
-        const status = await response.json();
-
-        if (!response.ok) {
-          throw new Error(status.error || "读取视觉状态失败");
-        }
-
-        renderVisionStatus(status);
-      } catch (error) {
-        const dot = document.getElementById("visionStateDot");
-        dot.className = "state-dot offline";
-        document.getElementById("visionStateText").textContent =
-          "视觉接口不可用";
-        document.getElementById("visionError").textContent =
-          error.message;
+    function refreshVisionStatus() {
+      if (visionStatusRefreshPromise) {
+        visionStatusRefreshQueued = true;
+        return visionStatusRefreshPromise;
       }
+
+      const requestRevision = visionMutationRevision;
+      visionStatusRefreshPromise = Promise.resolve()
+        .then(async () => {
+          try {
+            const response = await fetch("/api/vision/status", {
+              cache: "no-store"
+            });
+            const status = await response.json();
+
+            if (!response.ok) {
+              throw new Error(status.error || "读取视觉状态失败");
+            }
+            if (requestRevision !== visionMutationRevision) {
+              return;
+            }
+
+            renderVisionStatus(status);
+          } catch (error) {
+            if (requestRevision !== visionMutationRevision) {
+              return;
+            }
+            const dot = document.getElementById("visionStateDot");
+            dot.className = "state-dot offline";
+            document.getElementById("visionStateText").textContent =
+              "视觉接口不可用";
+            document.getElementById("visionError").textContent =
+              error.message;
+          }
+        })
+        .finally(() => {
+          const rerunRequested =
+            visionStatusRefreshQueued ||
+            requestRevision !== visionMutationRevision;
+          visionStatusRefreshQueued = false;
+          visionStatusRefreshPromise = null;
+
+          if (rerunRequested) {
+            return refreshVisionStatus();
+          }
+        });
+
+      return visionStatusRefreshPromise;
     }
 
     function reconnectVisionStream() {

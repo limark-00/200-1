@@ -67,11 +67,57 @@ class VisionTemplateTests(unittest.TestCase):
         self.assertIn("let visionEventRefreshQueued = false;", self.html)
         self.assertIn("if (visionEventRefreshPromise)", self.html)
         self.assertIn("visionEventRefreshQueued = true;", self.html)
-        self.assertIn(
-            "const rerunRequested = visionEventRefreshQueued;",
+        self.assertRegex(
             self.html,
+            re.compile(
+                r"const rerunRequested =\s+"
+                r"visionEventRefreshQueued \|\|",
+            ),
         )
         self.assertIn("if (rerunRequested)", self.html)
+        self.assertIn("return refreshVisionEvents();", self.html)
+
+    def test_status_and_zone_refreshes_are_single_flight(self):
+        for refresh_type in ("Status", "Zone"):
+            self.assertIn(
+                f"let vision{refresh_type}RefreshPromise = null;",
+                self.html,
+            )
+            self.assertIn(
+                f"let vision{refresh_type}RefreshQueued = false;",
+                self.html,
+            )
+            self.assertIn(
+                f"if (vision{refresh_type}RefreshPromise)",
+                self.html,
+            )
+            self.assertIn(
+                f"vision{refresh_type}RefreshQueued = true;",
+                self.html,
+            )
+            self.assertIn(
+                f"return refreshVision{refresh_type}();",
+                self.html,
+            )
+
+    def test_refreshes_discard_pre_mutation_responses(self):
+        self.assertIn("let visionMutationRevision = 0;", self.html)
+        self.assertGreaterEqual(
+            self.html.count(
+                "const requestRevision = visionMutationRevision;"
+            ),
+            3,
+        )
+        self.assertGreaterEqual(
+            self.html.count(
+                "requestRevision !== visionMutationRevision"
+            ),
+            3,
+        )
+        self.assertGreaterEqual(
+            self.html.count("visionMutationRevision += 1;"),
+            3,
+        )
 
     def test_zone_drag_waits_for_natural_image_dimensions(self):
         self.assertIn("function visionImageReady()", self.html)
