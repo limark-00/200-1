@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 import os
 import sys
 import threading
@@ -196,6 +197,10 @@ class VisionService:
         self._pending_delivery_audits: dict[
             tuple[int, str], tuple[bool, str]
         ] = {}
+        self._delivery_audit_inbox: deque[
+            tuple[int, str, bool, str]
+        ] = deque()
+        self._delivery_audit_lock = threading.Lock()
 
     def start(self) -> bool:
         """启动后台视觉线程；重复调用不会创建第二个线程。"""
@@ -208,8 +213,10 @@ class VisionService:
                     return False
                 self._stop_event.clear()
                 self._lifecycle_generation += 1
+                generation = self._lifecycle_generation
                 self._thread = threading.Thread(
                     target=self._run,
+                    args=(generation,),
                     name="yolo-vision",
                     daemon=True,
                 )
@@ -257,7 +264,7 @@ class VisionService:
                 people_count = 0
                 annotated = frame
         except Exception:
-            self._mark_observation_gap()
+            self._mark_observation_gap_for_generation(generation)
             raise
 
         with self._safety_lock:
@@ -293,7 +300,7 @@ class VisionService:
                 if detector_checkpoint is not None:
                     self._zone_detector._restore(detector_checkpoint)
                 self._restore_safety_observation(safety_checkpoint)
-                self._mark_observation_gap_locked()
+                self._mark_observation_gap_for_generation_locked(generation)
                 raise
 
             # The lifecycle lock makes the generation check and all externally
@@ -522,17 +529,31 @@ class VisionService:
                     error_text,
                 )
             except Exception as exc:
-                previous = self._pending_delivery_audits.get(audit_key)
-                ever_delivered = delivered or bool(previous and previous[0])
-                latest_error = error_text or (previous[1] if previous else "")
-                self._pending_delivery_audits[audit_key] = (
-                    ever_delivered,
-                    latest_error,
+                self._merge_pending_delivery_audit_locked(
+                    event_id,
+                    command,
+                    delivered,
+                    error_text,
                 )
                 self._record_storage_failure_locked(exc)
                 raise
             self._pending_delivery_audits.pop(audit_key, None)
             self._clear_storage_error_if_reconciled_locked()
+
+    def enqueue_alarm_delivery(
+        self,
+        event_id: int | None,
+        command: str,
+        delivered: bool,
+        error_text: str,
+    ) -> None:
+        """Queue an audit without blocking the safety-critical sender worker."""
+        if event_id is None or self._event_repository is None:
+            return
+        with self._delivery_audit_lock:
+            self._delivery_audit_inbox.append(
+                (event_id, command, delivered, error_text)
+            )
 
     def initialize_safety(self) -> None:
         """Recover persisted safety state before vision processing starts."""
@@ -589,6 +610,11 @@ class VisionService:
                 self._last_error = close_error
         if self._alarm_controller is not None:
             self._alarm_controller.wait_idle(timeout=3.0)
+            with self._safety_lock:
+                # A shutdown must not turn a detector back on after startup
+                # recovery failed.  The next startup owns that recovery.
+                if not self._startup_recovery_pending:
+                    self._try_reconcile_storage_locked()
             self._alarm_controller.stop(timeout=0.0)
 
     def get_latest_jpeg(self) -> bytes | None:
@@ -625,11 +651,11 @@ class VisionService:
                 "error": "视觉服务尚无可用画面",
             }
 
-        os.makedirs(directory, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         filename = f"vision_{timestamp}.jpg"
         filepath = os.path.join(directory, filename)
         try:
+            os.makedirs(directory, exist_ok=True)
             with open(filepath, "wb") as file:
                 file.write(jpeg)
         except OSError:
@@ -784,6 +810,20 @@ class VisionService:
             and not self._stop_event.is_set()
         )
 
+    def _set_runtime_status_for_generation(
+        self,
+        generation: int,
+        **changes: Any,
+    ) -> bool:
+        """Apply worker status only while its lifecycle is still current."""
+        with self._lifecycle_lock:
+            if not self._can_commit_generation(generation):
+                return False
+            with self._lock:
+                for name, value in changes.items():
+                    setattr(self, name, value)
+            return True
+
     def _safety_observation_checkpoint(self) -> tuple[Any, ...]:
         return (
             self._people_in_zone,
@@ -804,9 +844,20 @@ class VisionService:
             self._exit_elapsed,
         ) = checkpoint
 
-    def _mark_observation_gap(self) -> None:
+    def _mark_observation_gap_for_generation(self, generation: int) -> None:
         with self._safety_lock:
+            self._mark_observation_gap_for_generation_locked(generation)
+
+    def _mark_observation_gap_for_generation_locked(
+        self,
+        generation: int,
+    ) -> bool:
+        """Commit a discontinuity only while its lifecycle is still current."""
+        with self._lifecycle_lock:
+            if not self._can_commit_generation(generation):
+                return False
             self._mark_observation_gap_locked()
+            return True
 
     def _mark_observation_gap_locked(self) -> None:
         if self._zone_detector is not None:
@@ -842,6 +893,7 @@ class VisionService:
     def _prepare_storage_locked(self) -> None:
         if self._event_repository is None:
             raise RuntimeError("视觉事件存储未配置")
+        self._drain_delivery_audit_inbox_locked()
         if not self._storage_initialized or self._storage_error:
             try:
                 self._event_repository.initialize()
@@ -864,6 +916,34 @@ class VisionService:
                 self._startup_recovery_pending = False
         self._reconcile_pending_storage_locked()
         self._clear_storage_error_if_reconciled_locked()
+
+    def _drain_delivery_audit_inbox_locked(self) -> None:
+        with self._delivery_audit_lock:
+            queued = tuple(self._delivery_audit_inbox)
+            self._delivery_audit_inbox.clear()
+        for event_id, command, delivered, error_text in queued:
+            self._merge_pending_delivery_audit_locked(
+                event_id,
+                command,
+                delivered,
+                error_text,
+            )
+
+    def _merge_pending_delivery_audit_locked(
+        self,
+        event_id: int,
+        command: str,
+        delivered: bool,
+        error_text: str,
+    ) -> None:
+        audit_key = (event_id, command)
+        previous = self._pending_delivery_audits.get(audit_key)
+        ever_delivered = delivered or bool(previous and previous[0])
+        latest_error = error_text or (previous[1] if previous else "")
+        self._pending_delivery_audits[audit_key] = (
+            ever_delivered,
+            latest_error,
+        )
 
     def _try_reconcile_storage_locked(self) -> str:
         if self._event_repository is None:
@@ -917,15 +997,20 @@ class VisionService:
             raise RuntimeError("危险区域检测器未配置")
         return self._event_repository, self._zone_detector
 
-    def _run(self) -> None:
+    def _run(self, generation: int) -> None:
         capture = None
-        with self._lock:
-            self._running = True
+        if not self._set_runtime_status_for_generation(
+            generation,
+            _running=True,
+        ):
+            return
 
         try:
             model = self._model_factory(self.settings.model_name)
-            with self._lock:
-                self._model_loaded = True
+            self._set_runtime_status_for_generation(
+                generation,
+                _model_loaded=True,
+            )
 
             while not self._stop_event.is_set():
                 try:
@@ -935,9 +1020,11 @@ class VisionService:
                             f"无法打开摄像头索引 {self.settings.camera_index}"
                         )
 
-                    with self._lock:
-                        self._camera_online = True
-                        self._last_error = ""
+                    self._set_runtime_status_for_generation(
+                        generation,
+                        _camera_online=True,
+                        _last_error="",
+                    )
 
                     frame_number = 0
                     while not self._stop_event.is_set():
@@ -952,22 +1039,26 @@ class VisionService:
                             continue
                         self.process_frame(model, frame)
                 except Exception:  # noqa: BLE001
-                    self._mark_observation_gap()
-                    with self._lock:
-                        self._camera_online = False
-                        self._last_error = "视觉处理暂时失败"
+                    self._mark_observation_gap_for_generation(generation)
+                    self._set_runtime_status_for_generation(
+                        generation,
+                        _camera_online=False,
+                        _last_error="视觉处理暂时失败",
+                    )
                     if self._stop_event.wait(self.settings.reconnect_delay):
                         break
-                    self._mark_observation_gap()
+                    self._mark_observation_gap_for_generation(generation)
                 finally:
                     if capture is not None:
                         capture.release()
                         capture = None
         except Exception:  # noqa: BLE001
-            self._mark_observation_gap()
-            with self._lock:
-                self._model_loaded = False
-                self._last_error = "YOLO模型加载失败"
+            self._mark_observation_gap_for_generation(generation)
+            self._set_runtime_status_for_generation(
+                generation,
+                _model_loaded=False,
+                _last_error="YOLO模型加载失败",
+            )
         finally:
             if capture is not None:
                 capture.release()

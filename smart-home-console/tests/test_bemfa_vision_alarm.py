@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import requests
 
@@ -52,6 +52,36 @@ class BemfaVisionAlarmParserTests(unittest.TestCase):
         self.assertEqual(result["error"], "巴法云指令下发失败")
         self.assertNotIn(secret, str(result))
         self.assertNotIn("?uid=", str(result))
+
+    def test_send_uses_one_total_timeout_budget_across_fallback(self) -> None:
+        fallback_response = Mock()
+        fallback_response.json.return_value = {"code": 0}
+
+        with (
+            patch.object(bemfa_api.config, "MOCK_MODE", False),
+            patch.object(bemfa_api.config, "BEMFA_UID", "configured-secret"),
+            patch.object(
+                bemfa_api.requests,
+                "post",
+                side_effect=requests.RequestException("primary failed"),
+            ) as post,
+            patch.object(
+                bemfa_api.requests,
+                "get",
+                return_value=fallback_response,
+            ) as fallback,
+        ):
+            result = send_msg(
+                "env",
+                "vision_alarm_off",
+                timeout=0.5,
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertGreater(post.call_args.kwargs["timeout"], 0.0)
+        self.assertLessEqual(post.call_args.kwargs["timeout"], 0.5)
+        self.assertGreater(fallback.call_args.kwargs["timeout"], 0.0)
+        self.assertLessEqual(fallback.call_args.kwargs["timeout"], 0.5)
 
 
 if __name__ == "__main__":

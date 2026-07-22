@@ -20,7 +20,12 @@ class AlarmTask:
 
 
 class VisionAlarmController:
-    """Serializes alarm delivery so inference never waits on network I/O."""
+    """Serialize bounded sender calls so inference never waits on network I/O.
+
+    The injected sender must enforce its own finite call budget.  Keeping calls
+    synchronous and single-worker prevents an older alarm-on request from
+    completing after a concurrently launched emergency alarm-off request.
+    """
 
     RETRY_DELAYS = (0.0, 2.0, 5.0)
     _STOP = object()
@@ -99,7 +104,6 @@ class VisionAlarmController:
                 return
             if not self._stopping:
                 self._stopping = True
-                self._generation += 1
                 self._wake.set()
                 self._queue.put(self._STOP)
 
@@ -134,18 +138,27 @@ class VisionAlarmController:
                 self._queue.task_done()
 
     def _deliver(self, task: AlarmTask) -> None:
+        # A forced/newer target is a cancellation watermark.  Drop tasks that
+        # were still queued before their first attempt; only the one already
+        # inside the bounded sender can precede the newer safety target.
+        if self._is_stale(task):
+            return
+
         command = "vision_alarm_on" if task.enabled else "vision_alarm_off"
         delivered = False
         error = ""
 
         for attempt, delay in enumerate(self.RETRY_DELAYS):
-            # Preserve queue ordering by allowing every accepted task one
-            # immediate attempt.  Only its delayed retries are superseded.
-            if attempt and self._is_superseded(task):
+            if self._is_stale(task):
                 return
+            if attempt and self._is_stopping():
+                break
             if delay:
-                if self._wait_for_retry(task, delay):
+                self._wait_for_retry(delay)
+                if self._is_stale(task):
                     return
+                if self._is_stopping():
+                    break
             try:
                 result = self._sender(command)
             except Exception:  # Sender is an injected network boundary.
@@ -158,12 +171,12 @@ class VisionAlarmController:
                 break
             error = ALARM_DELIVERY_ERROR
 
-        superseded = self._is_superseded(task)
-        if superseded and not delivered:
+        stale = self._is_stale(task)
+        if stale and not delivered:
             return
 
         with self._lock:
-            if not superseded:
+            if not stale:
                 self._last_error = error
 
         try:
@@ -177,14 +190,17 @@ class VisionAlarmController:
             with self._lock:
                 self._callback_error = ""
 
-    def _is_superseded(self, task: AlarmTask) -> bool:
+    def _is_stale(self, task: AlarmTask) -> bool:
         with self._lock:
-            return self._stopping or task.generation != self._generation
+            return task.generation != self._generation
 
-    def _wait_for_retry(self, task: AlarmTask, delay: float) -> bool:
+    def _is_stopping(self) -> bool:
+        with self._lock:
+            return self._stopping
+
+    def _wait_for_retry(self, delay: float) -> None:
         """Wait for a retry while allowing a newer target to interrupt it."""
         if self._sleeper is not None:
             self._sleeper(delay)
         else:
             self._wake.wait(delay)
-        return self._is_superseded(task)

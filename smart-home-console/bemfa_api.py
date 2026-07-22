@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 import threading
+import time
 from typing import Any
 
 import requests
@@ -158,10 +160,18 @@ def get_topic_msg(topic: str) -> dict[str, Any]:
     }
 
 
-def send_msg(topic: str, msg: str) -> dict[str, Any]:
-    """向控制主题推送消息。开发板订阅env004时，topic应为env004。"""
+def send_msg(
+    topic: str,
+    msg: str,
+    *,
+    timeout: float = 10.0,
+) -> dict[str, Any]:
+    """向控制主题推送消息，主接口和兼容回退共享一个时间预算。"""
     topic = str(topic or "").strip()
     message = str(msg or "").strip()
+    timeout = float(timeout)
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("timeout must be a positive finite number")
 
     if not topic:
         return {"ok": False, "error": "topic为空", "raw": None}
@@ -189,17 +199,29 @@ def send_msg(topic: str, msg: str) -> dict[str, Any]:
         "type": config.BEMFA_TYPE,
         "msg": message,
     }
+    deadline = time.monotonic() + timeout
 
     try:
-        resp = requests.post(POST_MSG_URL, json=payload, timeout=10)
+        resp = requests.post(
+            POST_MSG_URL,
+            json=payload,
+            timeout=max(0.001, deadline - time.monotonic()),
+        )
         resp.raise_for_status()
         data = resp.json()
     except (requests.RequestException, ValueError):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return {
+                "ok": False,
+                "error": "巴法云指令下发失败",
+                "raw": None,
+            }
         try:
             resp = requests.get(
                 LEGACY_SEND_MSG_URL,
                 params=payload,
-                timeout=10,
+                timeout=remaining,
             )
             resp.raise_for_status()
             data = resp.json()

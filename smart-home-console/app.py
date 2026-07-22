@@ -52,6 +52,7 @@ from zone_detector import NormalizedZone, ZoneDetector
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+VISION_ALARM_SEND_BUDGET_SECONDS = 0.5
 
 # ---------- 运行时状态（可被页面开关改写）----------
 _runtime_mock = bool(config.MOCK_MODE)
@@ -86,10 +87,21 @@ zone_detector = ZoneDetector(
     config.VISION_ENTER_SECONDS,
     config.VISION_EXIT_SECONDS,
 )
+
+
+def _send_vision_alarm(command: str) -> dict[str, Any]:
+    """Use a short total budget so shutdown off is not stuck behind network I/O."""
+    return bemfa_api.send_msg(
+        config.ENV_TOPIC,
+        command,
+        timeout=VISION_ALARM_SEND_BUDGET_SECONDS,
+    )
+
+
 alarm_controller = VisionAlarmController(
-    lambda command: bemfa_api.send_msg(config.ENV_TOPIC, command),
+    _send_vision_alarm,
     delivery_callback=lambda event_id, command, delivered, error: (
-        vision_service.record_alarm_delivery(
+        vision_service.enqueue_alarm_delivery(
             event_id,
             command,
             delivered,
@@ -212,7 +224,6 @@ async def lifespan(_app: FastAPI):
     try:
         yield
     finally:
-        vision_service.stop()
         vision_service.shutdown_safety()
         if getattr(config, "ENABLE_PIR_POLLER", False):
             _stop_poller()
@@ -432,6 +443,18 @@ def _event_response(event: dict[str, Any]) -> dict[str, Any]:
         if filename
         else None
     )
+    safe_errors = {
+        "",
+        "保存视觉告警截图失败",
+        "保存视觉告警截图失败：未配置截图目录",
+        "视觉告警指令发送失败",
+    }
+    last_error = result.get("last_error")
+    result["last_error"] = (
+        last_error
+        if isinstance(last_error, str) and last_error in safe_errors
+        else "视觉事件历史错误已隐藏"
+    )
     return result
 
 
@@ -587,6 +610,8 @@ async def api_capture_now():
     if not public_result.get("ok"):
         public_result["error"] = "保存视觉截图失败"
         return JSONResponse(content=public_result, status_code=500)
+    if public_result.get("error"):
+        public_result["error"] = "抓拍已完成但使用占位图"
     return public_result
 
 

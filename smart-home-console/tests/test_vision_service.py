@@ -327,6 +327,28 @@ class VisionServiceTests(unittest.TestCase):
             with open(result["path"], "rb") as file:
                 self.assertEqual(file.read(), b"jpeg:annotated-frame")
 
+    def test_save_snapshot_directory_failure_is_sanitized(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        blocked_directory = os.path.join(temporary.name, "not-a-directory")
+        with open(blocked_directory, "wb") as blocker:
+            blocker.write(b"block directory creation")
+        service = self.make_service()
+        service._latest_jpeg = b"jpeg-frame"
+
+        result = service.save_snapshot(blocked_directory)
+
+        self.assertEqual(
+            result,
+            {
+                "ok": False,
+                "filename": "",
+                "path": "",
+                "error": "保存视觉截图失败",
+            },
+        )
+        self.assertNotIn(temporary.name, str(result))
+
     def test_save_snapshot_reports_when_no_frame_is_available(self):
         service = self.make_service()
 
@@ -727,6 +749,75 @@ class VisionServiceTests(unittest.TestCase):
         )
         self.assertTrue(capture.released)
 
+    def test_prediction_failure_after_stop_cannot_mutate_detector(self):
+        class BlockingFailingModel:
+            def __init__(self):
+                self.started = threading.Event()
+                self.release = threading.Event()
+
+            def predict(self, _frame, **_kwargs):
+                self.started.set()
+                self.release.wait(1.0)
+                raise RuntimeError("prediction failed after stop")
+
+        service, detector, repository, alarm, _clock, _directory = (
+            self.make_safety_service()
+        )
+        service.process_frame(SafetyModel(), FakeFrame())
+        model = BlockingFailingModel()
+        errors = []
+
+        def process_blocked_frame():
+            try:
+                service.process_frame(model, FakeFrame())
+            except Exception as exc:  # Expected test boundary.
+                errors.append(exc)
+
+        worker = threading.Thread(target=process_blocked_frame)
+        worker.start()
+        self.assertTrue(model.started.wait(1.0))
+
+        service.stop(timeout=0.0)
+        model.release.set()
+        worker.join(1.0)
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(detector.get_status()["state"], "enter_pending")
+        self.assertEqual(repository.list_events(), [])
+        self.assertEqual(alarm.targets, [])
+
+    def test_capture_failure_after_stop_cannot_mutate_detector(self):
+        class BlockingFailingCapture(FakeCapture):
+            def __init__(self):
+                super().__init__()
+                self.started = threading.Event()
+                self.release_read = threading.Event()
+
+            def read(self):
+                self.started.set()
+                self.release_read.wait(1.0)
+                return False, None
+
+        capture = BlockingFailingCapture()
+        service, detector, repository, alarm, _clock, _directory = (
+            self.make_safety_service(capture_factory=lambda: capture)
+        )
+        service.process_frame(SafetyModel(), FakeFrame())
+        service.start()
+        self.assertTrue(capture.started.wait(1.0))
+
+        service.stop(timeout=0.0)
+        capture.release_read.set()
+        service.stop(timeout=1.0)
+
+        self.assertEqual(detector.get_status()["state"], "enter_pending")
+        self.assertEqual(repository.list_events(), [])
+        self.assertEqual(alarm.targets, [])
+        self.assertTrue(capture.released)
+        status = service.get_status()
+        self.assertFalse(status["camera_online"])
+        self.assertEqual(status["last_error"], "")
+
     def test_stop_during_encoding_rolls_back_safety_update_and_publication(self):
         encoder_started = threading.Event()
         release_encoder = threading.Event()
@@ -763,6 +854,46 @@ class VisionServiceTests(unittest.TestCase):
         self.assertEqual(repository.list_events(), [])
         self.assertEqual(alarm.targets, [])
         self.assertEqual(service.get_status()["frame_sequence"], baseline_sequence)
+
+    def test_encoding_failure_after_stop_cannot_mutate_detector(self):
+        encoder_started = threading.Event()
+        release_encoder = threading.Event()
+        call_count = 0
+
+        def blocking_failing_encoder(frame, quality):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                encoder_started.set()
+                release_encoder.wait(1.0)
+                raise RuntimeError("encoding failed after stop")
+            return fake_encoder(frame, quality)
+
+        service, detector, repository, alarm, _clock, _directory = (
+            self.make_safety_service()
+        )
+        service._frame_encoder = blocking_failing_encoder
+        service.process_frame(SafetyModel(), FakeFrame())
+        errors = []
+
+        def process_blocked_frame():
+            try:
+                service.process_frame(SafetyModel(), FakeFrame())
+            except Exception as exc:  # Expected test boundary.
+                errors.append(exc)
+
+        worker = threading.Thread(target=process_blocked_frame)
+        worker.start()
+        self.assertTrue(encoder_started.wait(1.0))
+
+        service.stop(timeout=0.0)
+        release_encoder.set()
+        worker.join(1.0)
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(detector.get_status()["state"], "enter_pending")
+        self.assertEqual(repository.list_events(), [])
+        self.assertEqual(alarm.targets, [])
 
     def test_delete_active_zone_closes_event_and_turns_alarm_off(self):
         service, detector, repository, alarm, _clock, _directory = (
@@ -946,6 +1077,39 @@ class VisionServiceTests(unittest.TestCase):
         )
         self.assertEqual(service.get_status()["storage_error"], "")
 
+    def test_shutdown_does_not_restore_zone_after_startup_recovery_failure(self):
+        class RecoveringRepository(EventRepository):
+            fail_initialize = False
+
+            def initialize(self):
+                if self.fail_initialize:
+                    raise OSError("database temporarily unavailable")
+                return super().initialize()
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        repository = RecoveringRepository(
+            os.path.join(temporary.name, "events.db")
+        )
+        repository.initialize()
+        repository.save_zone(NormalizedZone(0.2, 0.2, 0.4, 0.4))
+        repository.fail_initialize = True
+        detector = ZoneDetector(2.0, 3.0, clock=FakeClock())
+        service = self.make_service(
+            zone_detector=detector,
+            event_repository=repository,
+            alarm_controller=RecordingAlarm(),
+            event_snapshot_dir=temporary.name,
+            overlay_renderer=lambda frame, _zone, _state: frame,
+        )
+
+        service.initialize_safety()
+        repository.fail_initialize = False
+        service.shutdown_safety()
+
+        self.assertEqual(detector.get_status()["state"], "disabled")
+        self.assertIsNone(detector.get_status()["zone"])
+
     def test_acknowledgment_rejects_open_row_that_is_not_detector_event(self):
         service, _detector, repository, _alarm, _clock, _directory = (
             self.active_safety_service()
@@ -1046,6 +1210,25 @@ class VisionServiceTests(unittest.TestCase):
 
         self.assertTrue(repository.get_event(event_id)["alarm_on_delivered"])
         self.assertEqual(service.get_status()["storage_error"], "")
+
+    def test_enqueued_delivery_audit_reconciles_on_storage_operation(self):
+        service, _detector, repository, _alarm, _clock, _directory = (
+            self.active_safety_service()
+        )
+        event_id = repository.list_events()[0]["id"]
+
+        service.enqueue_alarm_delivery(
+            event_id,
+            "vision_alarm_on",
+            True,
+            "",
+        )
+
+        self.assertFalse(
+            repository.get_event(event_id)["alarm_on_delivered"]
+        )
+        service.list_events()
+        self.assertTrue(repository.get_event(event_id)["alarm_on_delivered"])
 
     def test_list_events_delegates_limit_to_repository(self):
         service, _detector, repository, _alarm, _clock, _directory = (

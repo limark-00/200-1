@@ -67,6 +67,7 @@ class FakeVisionService:
 
     def shutdown_safety(self) -> None:
         self.lifecycle_calls.append("shutdown_safety")
+        self.stopped = True
 
     def get_status(self):
         return {
@@ -137,7 +138,7 @@ class VisionApiTests(unittest.TestCase):
         self.assertTrue(fake.stopped)
         self.assertEqual(
             fake.lifecycle_calls,
-            ["initialize_safety", "start", "stop", "shutdown_safety"],
+            ["initialize_safety", "start", "shutdown_safety"],
         )
 
     def test_frame_endpoint_returns_latest_jpeg(self):
@@ -263,6 +264,27 @@ class VisionApiTests(unittest.TestCase):
         self.assertEqual(response.json()["events"][0]["snapshot_filename"], "")
         self.assertIsNone(response.json()["events"][0]["snapshot_url"])
         self.assertNotIn(secret_directory, response.text)
+
+    def test_legacy_event_error_is_redacted_before_history_response(self):
+        fake = FakeVisionService()
+        secret = "legacy-bemfa-uid"
+        secret_directory = "/private/runtime/evidence"
+        fake.events[0]["last_error"] = (
+            f"GET https://example.test/send?uid={secret}; "
+            f"snapshot={secret_directory}/event.jpg"
+        )
+
+        with self.open_client(fake), TestClient(app_module.app) as client:
+            response = client.get("/api/vision/events")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["events"][0]["last_error"],
+            "视觉事件历史错误已隐藏",
+        )
+        self.assertNotIn(secret, response.text)
+        self.assertNotIn(secret_directory, response.text)
+        self.assertNotIn("?uid=", response.text)
 
     def test_non_default_event_directory_is_served_on_dedicated_mount(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -394,6 +416,48 @@ class VisionApiTests(unittest.TestCase):
 
         self.assertEqual(topics, ["env-control/up"])
         self.assertEqual(response.json()["data"]["vision_alarm"], 1)
+
+    def test_capture_success_warning_does_not_expose_runtime_details(self):
+        fake = FakeVisionService(None)
+        secret_directory = "/private/runtime/captures"
+        capture_result = {
+            "ok": True,
+            "filename": "capture.jpg",
+            "path": f"{secret_directory}/capture.jpg",
+            "error": f"camera fallback failed at {secret_directory}",
+        }
+
+        with (
+            patch.object(
+                app_module.camera,
+                "capture_photo",
+                return_value=capture_result,
+            ),
+            self.open_client(fake),
+            TestClient(app_module.app) as client,
+        ):
+            response = client.post("/api/capture/now")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["path"], "capture.jpg")
+        self.assertEqual(
+            response.json()["error"],
+            "抓拍已完成但使用占位图",
+        )
+        self.assertNotIn(secret_directory, response.text)
+
+    def test_vision_alarm_sender_uses_bounded_total_timeout(self):
+        with patch.object(
+            app_module.bemfa_api,
+            "send_msg",
+            return_value={"ok": True},
+        ) as sender:
+            result = app_module._send_vision_alarm("vision_alarm_off")
+
+        self.assertTrue(result["ok"])
+        timeout = sender.call_args.kwargs["timeout"]
+        self.assertGreater(timeout, 0.0)
+        self.assertLessEqual(timeout, 1.0)
 
 
 if __name__ == "__main__":

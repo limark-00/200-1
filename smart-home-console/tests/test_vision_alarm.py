@@ -40,9 +40,65 @@ class VisionAlarmControllerTests(unittest.TestCase):
 
         controller.start()
         controller.set_alarm(True, event_id=7)
+        self.assertTrue(controller.wait_idle(1.0))
         controller.set_alarm(False, event_id=7)
         self.assertTrue(controller.wait_idle(1.0))
         controller.stop()
+
+        self.assertEqual(sent, ["vision_alarm_on", "vision_alarm_off"])
+
+    def test_forced_off_skips_queued_superseded_tasks(self):
+        sent = []
+        first_attempt_started = threading.Event()
+        release_first_attempt = threading.Event()
+
+        def sender(command):
+            sent.append(command)
+            if len(sent) == 1:
+                first_attempt_started.set()
+                release_first_attempt.wait(1.0)
+                return {"ok": False, "error": "offline"}
+            return {"ok": True}
+
+        controller = VisionAlarmController(
+            sender,
+            delivery_callback=lambda *_args: None,
+        )
+        controller.start()
+        controller.set_alarm(True, event_id=7)
+        self.assertTrue(first_attempt_started.wait(1.0))
+        controller.set_alarm(False, event_id=7)
+        controller.set_alarm(True, event_id=8)
+        controller.set_alarm(False, event_id=8, force=True)
+
+        release_first_attempt.set()
+
+        self.assertTrue(controller.wait_idle(1.0))
+        controller.stop()
+        self.assertEqual(sent, ["vision_alarm_on", "vision_alarm_off"])
+
+    def test_stop_does_not_drop_already_queued_forced_off_attempt(self):
+        sent = []
+        callback_started = threading.Event()
+        release_callback = threading.Event()
+
+        def delivery_callback(_event_id, command, _delivered, _error):
+            if command == "vision_alarm_on":
+                callback_started.set()
+                release_callback.wait(1.0)
+
+        controller = VisionAlarmController(
+            lambda command: sent.append(command) or {"ok": True},
+            delivery_callback=delivery_callback,
+        )
+        controller.start()
+        controller.set_alarm(True, event_id=9)
+        self.assertTrue(callback_started.wait(1.0))
+        controller.set_alarm(False, event_id=9, force=True)
+
+        controller.stop(timeout=0.0)
+        release_callback.set()
+        controller.stop(timeout=1.0)
 
         self.assertEqual(sent, ["vision_alarm_on", "vision_alarm_off"])
 
