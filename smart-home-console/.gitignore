@@ -15,3 +15,7 @@ Thumbs.db
 # 抓拍图片不进仓库（保留目录）
 static/captures/*
 !static/captures/.gitkeep
+
+# YOLO 模型权重和默认运行输出
+*.pt
+runs/

@@ -41,6 +41,24 @@ CAPTURE_COOLDOWN = 10
 CAPTURE_DIR = "static/captures"
 CAPTURE_LIST_LIMIT = 20
 
+# YOLO视觉监控（Ubuntu主机 + 罗技USB摄像头）
+# 首阶段仅做人员检测与实时标注画面，不包含危险区域和NFC联动。
+VISION_ENABLED = os.getenv("VISION_ENABLED", "1").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+VISION_CAMERA_INDEX = int(os.getenv("VISION_CAMERA_INDEX", "0"))
+VISION_MODEL = os.getenv("VISION_MODEL", "yolo11n.pt").strip()
+VISION_CONFIDENCE = float(os.getenv("VISION_CONFIDENCE", "0.40"))
+VISION_IMAGE_SIZE = int(os.getenv("VISION_IMAGE_SIZE", "640"))
+VISION_FRAME_SKIP = max(1, int(os.getenv("VISION_FRAME_SKIP", "2")))
+VISION_FRAME_WIDTH = int(os.getenv("VISION_FRAME_WIDTH", "640"))
+VISION_FRAME_HEIGHT = int(os.getenv("VISION_FRAME_HEIGHT", "480"))
+VISION_JPEG_QUALITY = int(os.getenv("VISION_JPEG_QUALITY", "80"))
+VISION_RECONNECT_DELAY = float(os.getenv("VISION_RECONNECT_DELAY", "2.0"))
+
 APP_HOST = "0.0.0.0"
 APP_PORT = 5001
 

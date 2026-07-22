@@ -5,7 +5,7 @@ app.py —— FastAPI 主程序
 功能概览：
 1. 提供网页控制台（templates/index.html）
 2. 提供传感器查询 / 设备控制 / 抓拍列表等 API
-3. 后台线程轮询 PIR：检测到「有人」就调用摄像头抓拍
+3. 后台运行 YOLO 人员检测，提供状态、单帧和 MJPEG 视频流
 4. 支持 Mock / 巴法云 模式切换（页面开关 + /api/mode）
 
 启动方式：
@@ -29,7 +29,7 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
@@ -38,6 +38,7 @@ from pydantic import BaseModel, Field
 import bemfa_api
 import camera
 import config
+from vision_service import VisionService, VisionSettings
 
 # ---------- 路径：以本文件所在目录为项目根，避免启动目录不对导致找不到模板/静态文件 ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +55,22 @@ _last_capture_lock = threading.Lock()
 _poller_started = False
 _poller_lock = threading.Lock()
 _poller_stop = threading.Event()
+
+# 整个进程共用同一个摄像头和 YOLO 模型，避免每个浏览器请求重复打开设备。
+vision_service = VisionService(
+    VisionSettings(
+        enabled=config.VISION_ENABLED,
+        camera_index=config.VISION_CAMERA_INDEX,
+        model_name=config.VISION_MODEL,
+        confidence=config.VISION_CONFIDENCE,
+        image_size=config.VISION_IMAGE_SIZE,
+        frame_skip=config.VISION_FRAME_SKIP,
+        width=config.VISION_FRAME_WIDTH,
+        height=config.VISION_FRAME_HEIGHT,
+        jpeg_quality=config.VISION_JPEG_QUALITY,
+        reconnect_delay=config.VISION_RECONNECT_DELAY,
+    )
+)
 
 
 def _set_mock_mode(enabled: bool) -> None:
@@ -134,10 +151,11 @@ def _stop_poller() -> None:
 async def lifespan(_app: FastAPI):
     """
     FastAPI 生命周期钩子：
-    - 启动时：拉起 PIR 轮询线程
-    - 关闭时：通知线程停止
+    - 启动时：拉起视觉服务与可选的 PIR 轮询线程
+    - 关闭时：释放摄像头并通知线程停止
     比在模块 import 时直接起线程更清晰，也适合 uvicorn 多 worker 场景的理解。
     """
+    vision_service.start()
     if getattr(config, "ENABLE_PIR_POLLER", False):
         _start_poller_once()
     print("=" * 50)
@@ -146,14 +164,17 @@ async def lifespan(_app: FastAPI):
     print(f"控制台: http://127.0.0.1:{config.APP_PORT}/")
     print(f"API文档: http://127.0.0.1:{config.APP_PORT}/docs")
     print("=" * 50)
-    yield
-    if getattr(config, "ENABLE_PIR_POLLER", False):
-        _stop_poller()
+    try:
+        yield
+    finally:
+        vision_service.stop()
+        if getattr(config, "ENABLE_PIR_POLLER", False):
+            _stop_poller()
 
 
 app = FastAPI(
     title="智能家居实训控制台",
-    description="HiSpark Hi3861 + 巴法云 + 电脑摄像头。打开 /docs 可交互测试 API。",
+    description="HiSpark Hi3861 + 巴法云 + YOLO视觉监控。打开 /docs 可交互测试 API。",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -301,6 +322,38 @@ async def api_env_send(body: EnvCommandBody):
     }
 
 
+@app.get("/api/vision/status", summary="查询YOLO视觉服务状态")
+async def api_vision_status():
+    """返回摄像头、模型、当前人数和处理帧率。"""
+    return vision_service.get_status()
+
+
+@app.get("/api/vision/frame", summary="获取最新YOLO标注帧")
+async def api_vision_frame():
+    """返回最新一帧JPEG，尚未获得摄像头画面时返回503。"""
+    jpeg = vision_service.get_latest_jpeg()
+    if jpeg is None:
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "error": "视觉服务尚无可用画面"},
+        )
+    return Response(
+        content=jpeg,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.get("/api/vision/stream", summary="YOLO标注画面MJPEG视频流")
+async def api_vision_stream():
+    """共享后台最新标注帧，不会因新建页面连接而重复打开摄像头。"""
+    return StreamingResponse(
+        vision_service.iter_mjpeg(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/api/captures", summary="抓拍照片列表")
 async def api_captures():
     """返回最近抓拍照片文件名列表（倒序，最多 20 张）。"""
@@ -342,7 +395,13 @@ async def api_mock_pir(body: MockPirBody = MockPirBody()):
 @app.post("/api/capture/now", summary="立即抓拍")
 async def api_capture_now():
     """手动立即抓拍一张（测摄像头用，不依赖 PIR）。"""
-    result = camera.capture_photo()
+    if vision_service.get_latest_jpeg() is not None:
+        result = vision_service.save_snapshot(
+            os.path.join(BASE_DIR, config.CAPTURE_DIR)
+        )
+    else:
+        # 视觉服务被关闭或尚未就绪时，保留原有单次抓拍能力。
+        result = camera.capture_photo()
     if not result.get("ok"):
         return JSONResponse(content=result, status_code=500)
     return result

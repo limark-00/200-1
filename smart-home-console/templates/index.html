@@ -191,6 +191,120 @@
       font-size: 13px;
     }
 
+    .vision-panel {
+      margin-bottom: 24px;
+      padding: 24px;
+      border: 1px solid #dce8f3;
+      border-radius: 18px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(30, 65, 96, 0.08);
+    }
+
+    .vision-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+
+    .vision-title h2 {
+      margin-bottom: 6px;
+      font-size: 21px;
+    }
+
+    .vision-title p {
+      color: #66798c;
+      font-size: 14px;
+    }
+
+    .vision-header-actions,
+    .vision-state {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .vision-reconnect {
+      padding: 9px 14px;
+      border: 1px solid #cbd9e5;
+      border-radius: 9px;
+      color: #29465f;
+      background: #f8fbfd;
+      cursor: pointer;
+    }
+
+    .vision-reconnect:hover {
+      border-color: #3484bd;
+      background: #edf6fc;
+    }
+
+    .vision-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+      gap: 20px;
+    }
+
+    .vision-frame-wrap {
+      position: relative;
+      overflow: hidden;
+      min-height: 300px;
+      aspect-ratio: 4 / 3;
+      border-radius: 14px;
+      background: #101a24;
+    }
+
+    .vision-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .vision-frame-label {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      padding: 6px 10px;
+      border-radius: 7px;
+      color: #ffffff;
+      background: rgba(12, 28, 42, 0.72);
+      font-size: 12px;
+    }
+
+    .vision-sidebar {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .vision-count {
+      padding: 22px;
+      border-radius: 14px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #1c547f, #2f85bd);
+    }
+
+    .vision-count-label {
+      margin-bottom: 9px;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 14px;
+    }
+
+    .vision-count-value {
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .vision-error {
+      min-height: 20px;
+      color: #b33c39;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
     .panel-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -357,8 +471,14 @@
       }
 
       .metric-grid,
-      .panel-grid {
+      .panel-grid,
+      .vision-layout {
         grid-template-columns: 1fr;
+      }
+
+      .vision-header {
+        align-items: flex-start;
+        flex-direction: column;
       }
 
       .overview {
@@ -383,6 +503,15 @@
 
       .control-form {
         flex-direction: column;
+      }
+
+      .vision-header-actions {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .vision-frame-wrap {
+        min-height: 210px;
       }
     }
   </style>
@@ -461,6 +590,66 @@
           烟雾及可燃气体传感器原始值
         </div>
       </article>
+    </section>
+
+    <section id="visionPanel" class="vision-panel">
+      <div class="vision-header">
+        <div class="vision-title">
+          <h2>YOLO视觉安全监控</h2>
+          <p>罗技摄像头实时画面，仅识别person类别并显示检测框。</p>
+        </div>
+
+        <div class="vision-header-actions">
+          <div class="vision-state">
+            <span id="visionStateDot" class="state-dot"></span>
+            <span id="visionStateText">视觉服务启动中</span>
+          </div>
+
+          <button
+            type="button"
+            id="visionReconnectButton"
+            class="vision-reconnect"
+          >
+            重连画面
+          </button>
+        </div>
+      </div>
+
+      <div class="vision-layout">
+        <div class="vision-frame-wrap">
+          <img
+            id="visionStream"
+            class="vision-frame"
+            src="/api/vision/stream"
+            alt="YOLO实时人员识别画面"
+          />
+          <span class="vision-frame-label">LIVE · PERSON DETECTION</span>
+        </div>
+
+        <aside class="vision-sidebar">
+          <div class="vision-count">
+            <div class="vision-count-label">当前识别人数</div>
+            <div id="visionPeopleCount" class="vision-count-value">--</div>
+          </div>
+
+          <div class="info-list">
+            <div class="info-row">
+              <span class="info-label">处理帧率</span>
+              <span id="visionFps" class="info-value">-- FPS</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">YOLO模型</span>
+              <span id="visionModelName" class="info-value">--</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">摄像头索引</span>
+              <span id="visionCameraIndex" class="info-value">--</span>
+            </div>
+          </div>
+
+          <p id="visionError" class="vision-error"></p>
+        </aside>
+      </div>
     </section>
 
     <section class="panel-grid">
@@ -614,6 +803,7 @@
 
   <script>
     const REFRESH_INTERVAL = 5000;
+    const VISION_STATUS_INTERVAL = 2000;
 
     let refreshing = false;
 
@@ -917,6 +1107,72 @@
       }
     }
 
+    function renderVisionStatus(status) {
+      const dot = document.getElementById("visionStateDot");
+      const stateText = document.getElementById("visionStateText");
+      const errorText = document.getElementById("visionError");
+
+      document.getElementById("visionPeopleCount").textContent =
+        status.people_count ?? "--";
+      document.getElementById("visionFps").textContent =
+        `${formatNumber(status.fps)} FPS`;
+      document.getElementById("visionModelName").textContent =
+        status.model_name || "--";
+      document.getElementById("visionCameraIndex").textContent =
+        status.camera_index ?? "--";
+
+      dot.className = "state-dot";
+
+      if (!status.enabled) {
+        dot.classList.add("offline");
+        stateText.textContent = "视觉功能已关闭";
+      } else if (
+        status.running &&
+        status.model_loaded &&
+        status.camera_online
+      ) {
+        dot.classList.add("online");
+        stateText.textContent = "实时识别中";
+      } else if (status.running && !status.last_error) {
+        stateText.textContent = "模型或摄像头启动中";
+      } else {
+        dot.classList.add("offline");
+        stateText.textContent = "视觉服务异常";
+      }
+
+      errorText.textContent = status.last_error || "";
+    }
+
+    async function refreshVisionStatus() {
+      try {
+        const response = await fetch("/api/vision/status", {
+          cache: "no-store"
+        });
+        const status = await response.json();
+
+        if (!response.ok) {
+          throw new Error(status.error || "读取视觉状态失败");
+        }
+
+        renderVisionStatus(status);
+      } catch (error) {
+        const dot = document.getElementById("visionStateDot");
+        dot.className = "state-dot offline";
+        document.getElementById("visionStateText").textContent =
+          "视觉接口不可用";
+        document.getElementById("visionError").textContent =
+          error.message;
+      }
+    }
+
+    function reconnectVisionStream() {
+      const stream = document.getElementById("visionStream");
+      const separator = "/api/vision/stream".includes("?") ? "&" : "?";
+      stream.src = `/api/vision/stream${separator}t=${Date.now()}`;
+      document.getElementById("visionStateText").textContent =
+        "正在重连画面";
+    }
+
     async function refreshEnvironmentData() {
       if (refreshing) {
         return;
@@ -1092,11 +1348,28 @@
         });
       });
 
+    document
+      .getElementById("visionReconnectButton")
+      .addEventListener("click", reconnectVisionStream);
+
+    document
+      .getElementById("visionStream")
+      .addEventListener("error", () => {
+        document.getElementById("visionError").textContent =
+          "实时画面连接失败，请检查摄像头后点击重连画面";
+      });
+
     refreshEnvironmentData();
+    refreshVisionStatus();
 
     setInterval(
       refreshEnvironmentData,
       REFRESH_INTERVAL
+    );
+
+    setInterval(
+      refreshVisionStatus,
+      VISION_STATUS_INTERVAL
     );
   </script>
 </body>
