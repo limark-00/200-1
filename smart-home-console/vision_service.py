@@ -162,6 +162,8 @@ class VisionService:
         self._event_snapshot_dir = event_snapshot_dir
         self._overlay_renderer = overlay_renderer or _default_overlay_renderer
 
+        self._lifecycle_lock = threading.Lock()
+        self._lifecycle_generation = 0
         self._lock = threading.Lock()
         self._frame_ready = threading.Condition(self._lock)
         self._safety_lock = threading.RLock()
@@ -190,91 +192,132 @@ class VisionService:
         if not self.settings.enabled:
             return False
 
-        with self._lock:
-            if self._thread is not None and self._thread.is_alive():
-                return False
-            self._stop_event.clear()
-            self._thread = threading.Thread(
-                target=self._run,
-                name="yolo-vision",
-                daemon=True,
-            )
-            self._thread.start()
+        with self._lifecycle_lock:
+            with self._lock:
+                if self._thread is not None and self._thread.is_alive():
+                    return False
+                self._stop_event.clear()
+                self._lifecycle_generation += 1
+                self._thread = threading.Thread(
+                    target=self._run,
+                    name="yolo-vision",
+                    daemon=True,
+                )
+                self._thread.start()
         return True
 
     def stop(self, timeout: float = 3.0) -> None:
         """停止线程并等待摄像头释放。"""
-        self._stop_event.set()
-        with self._frame_ready:
-            self._frame_ready.notify_all()
-
-        thread = self._thread
+        with self._lifecycle_lock:
+            self._stop_event.set()
+            self._lifecycle_generation += 1
+            with self._frame_ready:
+                thread = self._thread
+                self._frame_ready.notify_all()
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=timeout)
 
         with self._lock:
             self._running = False
             self._camera_online = False
+            if self._thread is thread and thread is not None and not thread.is_alive():
+                self._thread = None
 
     def process_frame(self, model: Any, frame: Any) -> bytes:
         """对单帧执行person检测、标注和JPEG编码。"""
-        results = model.predict(
-            frame,
-            classes=[0],
-            conf=self.settings.confidence,
-            imgsz=self.settings.image_size,
-            verbose=False,
-        )
+        with self._lifecycle_lock:
+            generation = self._lifecycle_generation
 
-        if results:
-            result = results[0]
-            boxes = getattr(result, "boxes", None)
-            people_count = len(boxes) if boxes is not None else 0
-            annotated = result.plot()
-        else:
-            boxes = None
-            people_count = 0
-            annotated = frame
+        try:
+            results = model.predict(
+                frame,
+                classes=[0],
+                conf=self.settings.confidence,
+                imgsz=self.settings.image_size,
+                verbose=False,
+            )
+
+            if results:
+                result = results[0]
+                boxes = getattr(result, "boxes", None)
+                people_count = len(boxes) if boxes is not None else 0
+                annotated = result.plot()
+            else:
+                boxes = None
+                people_count = 0
+                annotated = frame
+        except Exception:
+            self._mark_observation_gap()
+            raise
 
         with self._safety_lock:
-            if self._stop_event.is_set():
-                return self._frame_encoder(annotated, self.settings.jpeg_quality)
-
-            processing_error = ""
-            if self._zone_detector is not None:
-                height, width = frame.shape[:2]
-                foot_points = extract_foot_points(boxes, width, height)
-                previous_state = self._zone_detector.get_status()["state"]
-                update = self._zone_detector.update(foot_points)
-                self._update_safety_timers(previous_state, update)
-                detector_status = self._zone_detector.get_status()
-                annotated = self._overlay_renderer(
-                    annotated,
-                    detector_status["zone"],
-                    update.state,
-                )
-            jpeg = self._frame_encoder(annotated, self.settings.jpeg_quality)
-            if self._zone_detector is not None:
-                processing_error = self._coordinate_zone_update(update, jpeg)
-
-            now = time.monotonic()
-
-            with self._frame_ready:
-                if self._last_frame_time is not None and now > self._last_frame_time:
-                    instant_fps = 1.0 / (now - self._last_frame_time)
-                    self._fps = (
-                        instant_fps
-                        if self._fps == 0.0
-                        else self._fps * 0.8 + instant_fps * 0.2
+            with self._lifecycle_lock:
+                if not self._can_commit_generation(generation):
+                    return self._frame_encoder(
+                        annotated,
+                        self.settings.jpeg_quality,
                     )
-                self._last_frame_time = now
-                self._latest_jpeg = jpeg
-                self._people_count = people_count
-                self._frame_sequence += 1
-                self._last_error = processing_error
-                self._frame_ready.notify_all()
 
-        return jpeg
+            detector_checkpoint = None
+            safety_checkpoint = self._safety_observation_checkpoint()
+            try:
+                processing_error = ""
+                if self._zone_detector is not None:
+                    detector_checkpoint = self._zone_detector._checkpoint()
+                    height, width = frame.shape[:2]
+                    foot_points = extract_foot_points(boxes, width, height)
+                    previous_state = self._zone_detector.get_status()["state"]
+                    update = self._zone_detector.update(foot_points)
+                    self._update_safety_timers(previous_state, update)
+                    detector_status = self._zone_detector.get_status()
+                    annotated = self._overlay_renderer(
+                        annotated,
+                        detector_status["zone"],
+                        update.state,
+                    )
+                jpeg = self._frame_encoder(
+                    annotated,
+                    self.settings.jpeg_quality,
+                )
+            except Exception:
+                if detector_checkpoint is not None:
+                    self._zone_detector._restore(detector_checkpoint)
+                self._restore_safety_observation(safety_checkpoint)
+                self._mark_observation_gap_locked()
+                raise
+
+            # The lifecycle lock makes the generation check and all externally
+            # visible side effects one commit relative to stop()/restart().
+            with self._lifecycle_lock:
+                if not self._can_commit_generation(generation):
+                    if detector_checkpoint is not None:
+                        self._zone_detector._restore(detector_checkpoint)
+                    self._restore_safety_observation(safety_checkpoint)
+                    return jpeg
+
+                if self._zone_detector is not None:
+                    processing_error = self._coordinate_zone_update(update, jpeg)
+
+                now = time.monotonic()
+                with self._frame_ready:
+                    if (
+                        self._last_frame_time is not None
+                        and now > self._last_frame_time
+                    ):
+                        instant_fps = 1.0 / (now - self._last_frame_time)
+                        self._fps = (
+                            instant_fps
+                            if self._fps == 0.0
+                            else self._fps * 0.8 + instant_fps * 0.2
+                        )
+                    self._last_frame_time = now
+                    self._latest_jpeg = jpeg
+                    self._people_count = people_count
+                    self._frame_sequence += 1
+                    self._last_error = processing_error
+                    self._frame_ready.notify_all()
+
+            return jpeg
 
     def get_status(self) -> dict[str, Any]:
         with self._lock:
@@ -571,6 +614,46 @@ class VisionService:
             self._exit_started_at = None
             self._exit_elapsed = 0.0
 
+    def _can_commit_generation(self, generation: int) -> bool:
+        """Return lifecycle validity while ``_lifecycle_lock`` is held."""
+        return (
+            generation == self._lifecycle_generation
+            and not self._stop_event.is_set()
+        )
+
+    def _safety_observation_checkpoint(self) -> tuple[Any, ...]:
+        return (
+            self._people_in_zone,
+            self._persisted_max_people,
+            self._enter_started_at,
+            self._exit_started_at,
+            self._enter_elapsed,
+            self._exit_elapsed,
+        )
+
+    def _restore_safety_observation(self, checkpoint: tuple[Any, ...]) -> None:
+        (
+            self._people_in_zone,
+            self._persisted_max_people,
+            self._enter_started_at,
+            self._exit_started_at,
+            self._enter_elapsed,
+            self._exit_elapsed,
+        ) = checkpoint
+
+    def _mark_observation_gap(self) -> None:
+        with self._safety_lock:
+            self._mark_observation_gap_locked()
+
+    def _mark_observation_gap_locked(self) -> None:
+        if self._zone_detector is not None:
+            self._zone_detector.observation_gap()
+        self._people_in_zone = 0
+        self._enter_started_at = None
+        self._exit_started_at = None
+        self._enter_elapsed = 0.0
+        self._exit_elapsed = 0.0
+
     def _reset_safety_observation(self) -> None:
         self._people_in_zone = 0
         self._persisted_max_people = 0
@@ -621,16 +704,19 @@ class VisionService:
                             continue
                         self.process_frame(model, frame)
                 except Exception as exc:  # noqa: BLE001
+                    self._mark_observation_gap()
                     with self._lock:
                         self._camera_online = False
                         self._last_error = str(exc)
                     if self._stop_event.wait(self.settings.reconnect_delay):
                         break
+                    self._mark_observation_gap()
                 finally:
                     if capture is not None:
                         capture.release()
                         capture = None
         except Exception as exc:  # noqa: BLE001
+            self._mark_observation_gap()
             with self._lock:
                 self._model_loaded = False
                 self._last_error = f"YOLO模型加载失败：{exc}"

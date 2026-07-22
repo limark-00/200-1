@@ -150,6 +150,52 @@ class VisionAlarmControllerTests(unittest.TestCase):
 
         self.assertEqual(sent, ["vision_alarm_on"])
 
+    def test_superseded_on_retry_is_cancelled_so_off_is_prompt(self):
+        sent = []
+        first_on_attempt = threading.Event()
+        off_delivered = threading.Event()
+
+        def sender(command):
+            sent.append(command)
+            if command == "vision_alarm_on":
+                first_on_attempt.set()
+                return {"ok": False, "error": "offline"}
+            off_delivered.set()
+            return {"ok": True}
+
+        controller = VisionAlarmController(
+            sender,
+            delivery_callback=lambda *_args: None,
+        )
+        controller.start()
+        controller.set_alarm(True, event_id=7)
+        self.assertTrue(first_on_attempt.wait(1.0))
+
+        controller.set_alarm(False, event_id=7, force=True)
+
+        self.assertTrue(off_delivered.wait(0.5))
+        self.assertTrue(controller.wait_idle(1.0))
+        controller.stop()
+        self.assertEqual(sent, ["vision_alarm_on", "vision_alarm_off"])
+
+    def test_controller_can_restart_and_accept_same_target_again(self):
+        sent = []
+        controller = make_controller(
+            lambda command: sent.append(command) or {"ok": True}
+        )
+
+        self.assertTrue(controller.start())
+        self.assertTrue(controller.set_alarm(True, event_id=1))
+        self.assertTrue(controller.wait_idle(1.0))
+        controller.stop()
+
+        self.assertTrue(controller.start())
+        self.assertTrue(controller.set_alarm(True, event_id=2))
+        self.assertTrue(controller.wait_idle(1.0))
+        controller.stop()
+
+        self.assertEqual(sent, ["vision_alarm_on", "vision_alarm_on"])
+
 
 if __name__ == "__main__":
     unittest.main()

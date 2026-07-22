@@ -575,10 +575,15 @@ class VisionServiceTests(unittest.TestCase):
             def __init__(self, clock):
                 super().__init__(2.0, 3.0, clock=clock)
                 self.update_calls = 0
+                self.gap_calls = 0
 
             def update(self, foot_points):
                 self.update_calls += 1
                 return super().update(foot_points)
+
+            def observation_gap(self):
+                self.gap_calls += 1
+                return super().observation_gap()
 
         clock = FakeClock()
         detector = CountingDetector(clock)
@@ -599,8 +604,37 @@ class VisionServiceTests(unittest.TestCase):
         service.stop()
 
         self.assertEqual(detector.update_calls, 1)
-        self.assertEqual(detector.get_status()["state"], "enter_pending")
+        self.assertGreaterEqual(detector.gap_calls, 1)
+        self.assertEqual(detector.get_status()["state"], "armed")
         self.assertEqual(service.get_status()["enter_elapsed"], 0.0)
+
+    def test_prediction_error_marks_observation_gap(self):
+        class CountingDetector(ZoneDetector):
+            def __init__(self, clock):
+                super().__init__(2.0, 3.0, clock=clock)
+                self.gap_calls = 0
+
+            def observation_gap(self):
+                self.gap_calls += 1
+                return super().observation_gap()
+
+        class FailingModel:
+            def predict(self, _frame, **_kwargs):
+                raise RuntimeError("prediction interrupted")
+
+        clock = FakeClock()
+        detector = CountingDetector(clock)
+        detector.set_zone(NormalizedZone(0.1, 0.1, 0.8, 0.8))
+        service, _detector, _repository, _alarm, _clock, _directory = (
+            self.make_safety_service(detector=detector, clock=clock)
+        )
+        service.process_frame(SafetyModel(), FakeFrame())
+
+        with self.assertRaisesRegex(RuntimeError, "prediction interrupted"):
+            service.process_frame(FailingModel(), FakeFrame())
+
+        self.assertEqual(detector.gap_calls, 1)
+        self.assertEqual(detector.get_status()["state"], "armed")
 
     def test_process_frame_after_stop_returns_jpeg_without_publishing(self):
         service, detector, repository, alarm, _clock, _directory = (
@@ -662,6 +696,43 @@ class VisionServiceTests(unittest.TestCase):
             baseline_sequence,
         )
         self.assertTrue(capture.released)
+
+    def test_stop_during_encoding_rolls_back_safety_update_and_publication(self):
+        encoder_started = threading.Event()
+        release_encoder = threading.Event()
+        call_count = 0
+
+        def blocking_encoder(frame, quality):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                encoder_started.set()
+                release_encoder.wait(1.0)
+            return fake_encoder(frame, quality)
+
+        service, detector, repository, alarm, clock, _directory = (
+            self.make_safety_service()
+        )
+        service._frame_encoder = blocking_encoder
+        service.process_frame(SafetyModel(), FakeFrame())
+        clock.advance(2.0)
+        baseline_sequence = service.get_status()["frame_sequence"]
+        worker = threading.Thread(
+            target=service.process_frame,
+            args=(SafetyModel(), FakeFrame()),
+        )
+        worker.start()
+        self.assertTrue(encoder_started.wait(1.0))
+
+        service.stop(timeout=0.0)
+        release_encoder.set()
+        worker.join(1.0)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(detector.get_status()["state"], "enter_pending")
+        self.assertEqual(repository.list_events(), [])
+        self.assertEqual(alarm.targets, [])
+        self.assertEqual(service.get_status()["frame_sequence"], baseline_sequence)
 
     def test_delete_active_zone_closes_event_and_turns_alarm_off(self):
         service, detector, repository, alarm, _clock, _directory = (

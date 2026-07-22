@@ -52,6 +52,16 @@ class ZoneUpdate:
     event_id: int | None = None
 
 
+@dataclass(frozen=True)
+class _DetectorCheckpoint:
+    zone: NormalizedZone | None
+    state: ZoneState
+    enter_started_at: float | None
+    exit_started_at: float | None
+    max_people: int
+    active_event_id: int | None
+
+
 class ZoneDetector:
     def __init__(
         self,
@@ -131,6 +141,25 @@ class ZoneDetector:
                 return self._update(people_in_zone, alarm_cleared=True, event_id=event_id)
             return self._update(people_in_zone)
 
+    def observation_gap(self) -> ZoneUpdate:
+        """Break continuity without treating an unknown frame as vacancy.
+
+        A missing/failed observation invalidates pending entry time.  During an
+        active or silenced alarm it only clears a vacancy timer, preserving the
+        event identity until real empty frames are observed again.
+        """
+        with self._lock:
+            if self._state == ZoneState.ENTER_PENDING:
+                self._state = ZoneState.ARMED
+                self._enter_started_at = None
+                self._max_people = 0
+            elif self._state in (
+                ZoneState.ALARM_ACTIVE,
+                ZoneState.ALARM_SILENCED,
+            ):
+                self._exit_started_at = None
+            return self._update(0)
+
     def bind_event(self, event_id: int) -> bool:
         with self._lock:
             if (
@@ -159,6 +188,30 @@ class ZoneDetector:
                 "max_people": self._max_people,
                 "event_id": self._active_event_id,
             }
+
+    def _checkpoint(self) -> _DetectorCheckpoint:
+        """Capture state for VisionService's lifecycle commit barrier."""
+        with self._lock:
+            return _DetectorCheckpoint(
+                zone=self._zone,
+                state=self._state,
+                enter_started_at=self._enter_started_at,
+                exit_started_at=self._exit_started_at,
+                max_people=self._max_people,
+                active_event_id=self._active_event_id,
+            )
+
+    def _restore(self, checkpoint: _DetectorCheckpoint) -> None:
+        """Restore an update that lost the lifecycle commit race."""
+        if not isinstance(checkpoint, _DetectorCheckpoint):
+            raise TypeError("checkpoint 类型无效")
+        with self._lock:
+            self._zone = checkpoint.zone
+            self._state = checkpoint.state
+            self._enter_started_at = checkpoint.enter_started_at
+            self._exit_started_at = checkpoint.exit_started_at
+            self._max_people = checkpoint.max_people
+            self._active_event_id = checkpoint.active_event_id
 
     def _count_people(self, foot_points: Sequence[tuple[float, float]]) -> int:
         if self._zone is None:

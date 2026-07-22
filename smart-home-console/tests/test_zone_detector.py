@@ -117,6 +117,33 @@ class ZoneDetectorTests(unittest.TestCase):
         self.assertEqual(restarted.state, ZoneState.ENTER_PENDING)
         self.assertFalse(restarted.alarm_started)
 
+    def test_observation_gap_resets_pending_entry_timer(self):
+        clock = FakeClock()
+        detector = armed_detector(clock)
+
+        detector.update([(0.3, 0.4)])
+        clock.advance(10.0)
+        detector.observation_gap()
+        resumed = detector.update([(0.3, 0.4)])
+
+        self.assertEqual(resumed.state, ZoneState.ENTER_PENDING)
+        self.assertFalse(resumed.alarm_started)
+
+    def test_observation_gap_clears_vacancy_timer_without_closing_event(self):
+        clock = FakeClock()
+        detector = armed_detector(clock)
+        start_alarm(detector, clock)
+        detector.bind_event(17)
+
+        detector.update([])
+        clock.advance(10.0)
+        detector.observation_gap()
+        resumed = detector.update([])
+
+        self.assertEqual(resumed.state, ZoneState.ALARM_ACTIVE)
+        self.assertFalse(resumed.alarm_cleared)
+        self.assertEqual(detector.get_status()["event_id"], 17)
+
     def test_max_people_tracks_peak_for_active_event(self):
         clock = FakeClock()
         detector = armed_detector(clock)
@@ -170,6 +197,21 @@ class ZoneDetectorTests(unittest.TestCase):
 
         status = detector.get_status()
         self.assertEqual(status["state"], "alarm_active")
+        self.assertEqual(status["event_id"], 17)
+        self.assertEqual(status["zone"], replacement)
+
+    def test_replacing_zone_while_silenced_preserves_silenced_event(self):
+        clock = FakeClock()
+        detector = armed_detector(clock)
+        start_alarm(detector, clock)
+        detector.bind_event(17)
+        detector.acknowledge(17)
+        replacement = NormalizedZone(0.5, 0.1, 0.3, 0.4)
+
+        detector.set_zone(replacement)
+
+        status = detector.get_status()
+        self.assertEqual(status["state"], "alarm_silenced")
         self.assertEqual(status["event_id"], 17)
         self.assertEqual(status["zone"], replacement)
 
