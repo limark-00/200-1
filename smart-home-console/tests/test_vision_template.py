@@ -35,6 +35,27 @@ class VisionTemplateTests(unittest.TestCase):
         self.assertIn("function refreshVisionStatus()", self.html)
         self.assertIn("function reconnectVisionStream()", self.html)
 
+    def test_dashboard_contains_zone_editor_and_event_history(self):
+        for element_id in (
+            "visionZoneCanvas",
+            "visionZoneEditButton",
+            "visionZoneSaveButton",
+            "visionZoneCancelButton",
+            "visionZoneDeleteButton",
+            "visionZoneState",
+            "visionPeopleInZone",
+            "visionActiveAlert",
+            "visionAckButton",
+            "visionEventList",
+        ):
+            self.assertIn(f'id="{element_id}"', self.html)
+
+    def test_dashboard_uses_zone_and_event_interfaces(self):
+        self.assertIn('fetch("/api/vision/zone"', self.html)
+        self.assertIn('fetch("/api/vision/events"', self.html)
+        self.assertIn("function imageContentRect()", self.html)
+        self.assertIn("function normalizedZoneFromDrag", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()

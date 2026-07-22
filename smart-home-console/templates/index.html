@@ -261,10 +261,26 @@
       object-fit: contain;
     }
 
+    .vision-zone-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      touch-action: none;
+    }
+
+    .vision-zone-canvas.editing {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
     .vision-frame-label {
       position: absolute;
       top: 14px;
       left: 14px;
+      z-index: 3;
       padding: 6px 10px;
       border-radius: 7px;
       color: #ffffff;
@@ -303,6 +319,164 @@
       color: #b33c39;
       font-size: 13px;
       line-height: 1.5;
+    }
+
+    .vision-safety-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .vision-safety-card {
+      padding: 18px;
+      border: 1px solid #dce8f3;
+      border-radius: 14px;
+      background: #f8fbfd;
+    }
+
+    .vision-safety-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .vision-safety-heading h3 {
+      font-size: 17px;
+    }
+
+    .vision-zone-state {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .vision-zone-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      color: #617589;
+    }
+
+    .vision-zone-summary strong {
+      color: #1b2b3c;
+      font-size: 25px;
+    }
+
+    .vision-zone-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .vision-zone-button {
+      padding: 8px 12px;
+      border: 1px solid #cbd9e5;
+      border-radius: 8px;
+      color: #29465f;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    .vision-zone-button.primary {
+      border-color: #276fa7;
+      color: #ffffff;
+      background: #276fa7;
+    }
+
+    .vision-zone-button.danger {
+      border-color: #e5b5b3;
+      color: #a73734;
+      background: #fff7f7;
+    }
+
+    .vision-zone-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .vision-active-alert {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 42px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 9px;
+      color: #617589;
+      background: #eef3f7;
+    }
+
+    .vision-active-alert.alarm {
+      color: #8d2725;
+      background: #fdebea;
+    }
+
+    .vision-panel.zone-alarm {
+      border-color: #e35d5b;
+      box-shadow: 0 8px 26px rgba(227, 93, 91, 0.18);
+    }
+
+    .vision-zone-message {
+      min-height: 19px;
+      margin-top: 10px;
+      color: #617589;
+      font-size: 13px;
+    }
+
+    .vision-event-list {
+      display: grid;
+      gap: 10px;
+      max-height: 330px;
+      overflow-y: auto;
+    }
+
+    .vision-event {
+      padding: 12px;
+      border: 1px solid #dde7ef;
+      border-radius: 10px;
+      background: #ffffff;
+    }
+
+    .vision-event-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .vision-event-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px 14px;
+      color: #617589;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .vision-event-evidence {
+      display: inline-block;
+      margin-top: 8px;
+      color: #276fa7;
+      font-size: 13px;
+    }
+
+    .vision-event-error {
+      grid-column: 1 / -1;
+      color: #b33c39;
+    }
+
+    .vision-event-empty {
+      padding: 22px 10px;
+      color: #8191a1;
+      text-align: center;
     }
 
     .panel-grid {
@@ -472,7 +646,8 @@
 
       .metric-grid,
       .panel-grid,
-      .vision-layout {
+      .vision-layout,
+      .vision-safety-grid {
         grid-template-columns: 1fr;
       }
 
@@ -512,6 +687,10 @@
 
       .vision-frame-wrap {
         min-height: 210px;
+      }
+
+      .vision-event-meta {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -623,6 +802,11 @@
             src="/api/vision/stream"
             alt="YOLO实时人员识别画面"
           />
+          <canvas
+            id="visionZoneCanvas"
+            class="vision-zone-canvas"
+            aria-label="危险区域编辑画布"
+          ></canvas>
           <span class="vision-frame-label">LIVE · PERSON DETECTION</span>
         </div>
 
@@ -649,6 +833,82 @@
 
           <p id="visionError" class="vision-error"></p>
         </aside>
+      </div>
+
+      <div class="vision-safety-grid">
+        <section class="vision-safety-card">
+          <div class="vision-safety-heading">
+            <h3>危险区域</h3>
+            <span id="visionZoneState" class="vision-zone-state">未设置区域</span>
+          </div>
+
+          <div class="vision-zone-summary">
+            <span>区域内人数</span>
+            <strong id="visionPeopleInZone">0</strong>
+          </div>
+
+          <div id="visionActiveAlert" class="vision-active-alert">
+            <span>当前无活动告警</span>
+            <button
+              type="button"
+              id="visionAckButton"
+              class="vision-zone-button danger"
+              hidden
+            >
+              确认并静音
+            </button>
+          </div>
+
+          <div class="vision-zone-actions">
+            <button
+              type="button"
+              id="visionZoneEditButton"
+              class="vision-zone-button"
+            >
+              编辑危险区域
+            </button>
+            <button
+              type="button"
+              id="visionZoneSaveButton"
+              class="vision-zone-button primary"
+              disabled
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              id="visionZoneCancelButton"
+              class="vision-zone-button"
+              disabled
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              id="visionZoneDeleteButton"
+              class="vision-zone-button danger"
+              disabled
+            >
+              删除
+            </button>
+          </div>
+          <p id="visionZoneMessage" class="vision-zone-message">
+            点击编辑后，在画面内拖拽绘制一个矩形。
+          </p>
+        </section>
+
+        <section class="vision-safety-card">
+          <div class="vision-safety-heading">
+            <h3>告警事件记录</h3>
+          </div>
+          <div
+            id="visionEventList"
+            class="vision-event-list"
+            aria-live="polite"
+          >
+            <p class="vision-event-empty">正在读取事件……</p>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -804,8 +1064,42 @@
   <script>
     const REFRESH_INTERVAL = 5000;
     const VISION_STATUS_INTERVAL = 2000;
+    const VISION_EVENT_INTERVAL = 5000;
+    const MIN_ZONE_SIZE = 0.02;
+
+    const ZONE_STATE_LABELS = {
+      disabled: "未设置区域",
+      armed: "已布防",
+      enter_pending: "进入判定中",
+      alarm_active: "正在告警",
+      alarm_silenced: "已确认静音"
+    };
+
+    const ZONE_STATE_COLORS = {
+      disabled: { color: "#51606f", background: "#edf1f4" },
+      armed: { color: "#237448", background: "#e6f6ed" },
+      enter_pending: { color: "#8a5a10", background: "#fff1d5" },
+      alarm_active: { color: "#a3322f", background: "#fde3e2" },
+      alarm_silenced: { color: "#245f8d", background: "#e5f1f9" }
+    };
 
     let refreshing = false;
+    let savedVisionZone = null;
+    let draftVisionZone = null;
+    let visionZoneEditing = false;
+    let visionDragStart = null;
+    let previousZoneState;
+    let previousActiveEventId;
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;"
+      })[character]);
+    }
 
     function firstDefined(...values) {
       for (const value of values) {
@@ -1107,10 +1401,469 @@
       }
     }
 
+    async function readVisionResponse(response, fallbackMessage) {
+      let result;
+
+      try {
+        result = await response.json();
+      } catch (error) {
+        throw new Error(fallbackMessage);
+      }
+
+      if (!response.ok || result.ok === false) {
+        const serverMessage = firstDefined(
+          result.error,
+          result.message
+        );
+        throw new Error(
+          serverMessage === null
+            ? fallbackMessage
+            : String(serverMessage)
+        );
+      }
+
+      return result;
+    }
+
+    function validNormalizedZone(zone) {
+      if (!zone || typeof zone !== "object") {
+        return false;
+      }
+
+      const x = Number(zone.x);
+      const y = Number(zone.y);
+      const width = Number(zone.width);
+      const height = Number(zone.height);
+
+      return [x, y, width, height].every(Number.isFinite) &&
+        x >= 0 && y >= 0 &&
+        width >= MIN_ZONE_SIZE && height >= MIN_ZONE_SIZE &&
+        x + width <= 1 && y + height <= 1;
+    }
+
+    function copyNormalizedZone(zone) {
+      if (!validNormalizedZone(zone)) {
+        return null;
+      }
+
+      return {
+        x: Number(zone.x),
+        y: Number(zone.y),
+        width: Number(zone.width),
+        height: Number(zone.height)
+      };
+    }
+
+    function imageContentRect() {
+      const image = document.getElementById("visionStream");
+      const elementWidth = image.clientWidth;
+      const elementHeight = image.clientHeight;
+      const naturalWidth = image.naturalWidth;
+      const naturalHeight = image.naturalHeight;
+
+      if (
+        elementWidth <= 0 ||
+        elementHeight <= 0 ||
+        naturalWidth <= 0 ||
+        naturalHeight <= 0
+      ) {
+        return {
+          left: 0,
+          top: 0,
+          width: elementWidth,
+          height: elementHeight
+        };
+      }
+
+      const imageRatio = naturalWidth / naturalHeight;
+      const elementRatio = elementWidth / elementHeight;
+
+      if (elementRatio > imageRatio) {
+        const width = elementHeight * imageRatio;
+        return {
+          left: (elementWidth - width) / 2,
+          top: 0,
+          width,
+          height: elementHeight
+        };
+      }
+
+      const height = elementWidth / imageRatio;
+      return {
+        left: 0,
+        top: (elementHeight - height) / 2,
+        width: elementWidth,
+        height
+      };
+    }
+
+    function normalizedZoneFromDrag(
+      dragStart,
+      dragEnd,
+      contentRect = imageContentRect()
+    ) {
+      if (
+        !dragStart ||
+        !dragEnd ||
+        contentRect.width <= 0 ||
+        contentRect.height <= 0
+      ) {
+        return null;
+      }
+
+      const left = Math.max(
+        contentRect.left,
+        Math.min(dragStart.x, dragEnd.x)
+      );
+      const right = Math.min(
+        contentRect.left + contentRect.width,
+        Math.max(dragStart.x, dragEnd.x)
+      );
+      const top = Math.max(
+        contentRect.top,
+        Math.min(dragStart.y, dragEnd.y)
+      );
+      const bottom = Math.min(
+        contentRect.top + contentRect.height,
+        Math.max(dragStart.y, dragEnd.y)
+      );
+
+      const x = (left - contentRect.left) / contentRect.width;
+      const y = (top - contentRect.top) / contentRect.height;
+
+      return {
+        x,
+        y,
+        width: Math.min(
+          Math.max(0, right - left) / contentRect.width,
+          1 - x
+        ),
+        height: Math.min(
+          Math.max(0, bottom - top) / contentRect.height,
+          1 - y
+        )
+      };
+    }
+
+    function visionPointerPosition(event, rejectLetterbox) {
+      const canvas = document.getElementById("visionZoneCanvas");
+      const canvasRect = canvas.getBoundingClientRect();
+      const contentRect = imageContentRect();
+      const x = event.clientX - canvasRect.left;
+      const y = event.clientY - canvasRect.top;
+      const inside =
+        x >= contentRect.left &&
+        x <= contentRect.left + contentRect.width &&
+        y >= contentRect.top &&
+        y <= contentRect.top + contentRect.height;
+
+      if (rejectLetterbox && !inside) {
+        return null;
+      }
+
+      return {
+        x: Math.max(
+          contentRect.left,
+          Math.min(contentRect.left + contentRect.width, x)
+        ),
+        y: Math.max(
+          contentRect.top,
+          Math.min(contentRect.top + contentRect.height, y)
+        )
+      };
+    }
+
+    function drawVisionZone() {
+      const canvas = document.getElementById("visionZoneCanvas");
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const pixelRatio = window.devicePixelRatio || 1;
+
+      if (
+        canvas.width !== Math.round(width * pixelRatio) ||
+        canvas.height !== Math.round(height * pixelRatio)
+      ) {
+        canvas.width = Math.round(width * pixelRatio);
+        canvas.height = Math.round(height * pixelRatio);
+      }
+
+      const context = canvas.getContext("2d");
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      context.clearRect(0, 0, width, height);
+
+      const zone = draftVisionZone || savedVisionZone;
+      if (!zone) {
+        return;
+      }
+
+      const contentRect = imageContentRect();
+      const left = contentRect.left + zone.x * contentRect.width;
+      const top = contentRect.top + zone.y * contentRect.height;
+      const zoneWidth = zone.width * contentRect.width;
+      const zoneHeight = zone.height * contentRect.height;
+      const alarmActive = previousZoneState === "alarm_active";
+
+      context.fillStyle = alarmActive
+        ? "rgba(227, 93, 91, 0.24)"
+        : "rgba(244, 185, 66, 0.18)";
+      context.strokeStyle = alarmActive ? "#ef6461" : "#f4b942";
+      context.lineWidth = 3;
+      context.setLineDash(visionZoneEditing ? [8, 5] : []);
+      context.fillRect(left, top, zoneWidth, zoneHeight);
+      context.strokeRect(left, top, zoneWidth, zoneHeight);
+    }
+
+    function setVisionZoneEditor(editing) {
+      visionZoneEditing = editing;
+      visionDragStart = null;
+      draftVisionZone = null;
+
+      const canvas = document.getElementById("visionZoneCanvas");
+      const editButton = document.getElementById("visionZoneEditButton");
+      const saveButton = document.getElementById("visionZoneSaveButton");
+      const cancelButton = document.getElementById("visionZoneCancelButton");
+      const deleteButton = document.getElementById("visionZoneDeleteButton");
+
+      canvas.classList.toggle("editing", editing);
+      editButton.disabled = editing;
+      saveButton.disabled = true;
+      cancelButton.disabled = !editing;
+      deleteButton.disabled = editing || !savedVisionZone;
+      document.getElementById("visionZoneMessage").textContent = editing
+        ? "请从危险区域的一角拖拽到对角。"
+        : "点击编辑后，在画面内拖拽绘制一个矩形。";
+      drawVisionZone();
+    }
+
+    async function refreshVisionZone() {
+      try {
+        const response = await fetch("/api/vision/zone", {
+          cache: "no-store"
+        });
+        const result = await readVisionResponse(
+          response,
+          "读取危险区域失败"
+        );
+        savedVisionZone = copyNormalizedZone(result.zone);
+        if (!visionZoneEditing) {
+          document.getElementById("visionZoneDeleteButton").disabled =
+            !savedVisionZone;
+          drawVisionZone();
+        }
+      } catch (error) {
+        document.getElementById("visionZoneMessage").textContent =
+          error.message;
+      }
+    }
+
+    async function saveVisionZone() {
+      if (!validNormalizedZone(draftVisionZone)) {
+        return;
+      }
+
+      const saveButton = document.getElementById("visionZoneSaveButton");
+      saveButton.disabled = true;
+
+      try {
+        const response = await fetch("/api/vision/zone", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftVisionZone)
+        });
+        const result = await readVisionResponse(
+          response,
+          "保存危险区域失败"
+        );
+        savedVisionZone = copyNormalizedZone(result.zone);
+        setVisionZoneEditor(false);
+        document.getElementById("visionZoneMessage").textContent =
+          "危险区域已保存";
+        await Promise.all([
+          refreshVisionStatus(),
+          refreshVisionEvents()
+        ]);
+      } catch (error) {
+        document.getElementById("visionZoneMessage").textContent =
+          error.message;
+        saveButton.disabled = false;
+      }
+    }
+
+    async function deleteVisionZone() {
+      const deleteButton =
+        document.getElementById("visionZoneDeleteButton");
+      deleteButton.disabled = true;
+
+      try {
+        const response = await fetch("/api/vision/zone", {
+          method: "DELETE"
+        });
+        await readVisionResponse(response, "删除危险区域失败");
+        savedVisionZone = null;
+        setVisionZoneEditor(false);
+        document.getElementById("visionZoneMessage").textContent =
+          "危险区域已删除";
+        await Promise.all([
+          refreshVisionStatus(),
+          refreshVisionEvents()
+        ]);
+      } catch (error) {
+        document.getElementById("visionZoneMessage").textContent =
+          error.message;
+        deleteButton.disabled = !savedVisionZone;
+      }
+    }
+
+    function formatVisionEventTime(value) {
+      if (!value) {
+        return "--";
+      }
+
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? String(value)
+        : date.toLocaleString();
+    }
+
+    function formatVisionEventDuration(startedAt, endedAt) {
+      const start = new Date(startedAt).getTime();
+      const end = endedAt ? new Date(endedAt).getTime() : Date.now();
+
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+        return "--";
+      }
+
+      const totalSeconds = Math.floor((end - start) / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+    }
+
+    function renderVisionEvents(events) {
+      const list = document.getElementById("visionEventList");
+      list.replaceChildren();
+
+      if (!Array.isArray(events) || events.length === 0) {
+        list.innerHTML = '<p class="vision-event-empty">暂无告警事件</p>';
+        return;
+      }
+
+      events.forEach((event) => {
+        const item = document.createElement("article");
+        item.className = "vision-event";
+
+        const eventStatus = event.ended_at
+          ? "已结束"
+          : event.acknowledged_at
+            ? "已确认静音"
+            : "进行中";
+        const closeReason = event.close_reason || "--";
+        const deliveryState =
+          `开启${event.alarm_on_delivered ? "成功" : "未成功"}` +
+          ` / 关闭${event.alarm_off_delivered ? "成功" : "未成功"}`;
+        const errorMarkup = event.last_error
+          ? `<span class="vision-event-error">错误：${escapeHtml(event.last_error)}</span>`
+          : "";
+
+        item.innerHTML = `
+          <div class="vision-event-header">
+            <span>事件 #${escapeHtml(event.id)}</span>
+            <span>${escapeHtml(eventStatus)}</span>
+          </div>
+          <div class="vision-event-meta">
+            <span>开始：${escapeHtml(formatVisionEventTime(event.started_at))}</span>
+            <span>结束：${escapeHtml(formatVisionEventTime(event.ended_at))}</span>
+            <span>持续：${escapeHtml(formatVisionEventDuration(event.started_at, event.ended_at))}</span>
+            <span>最多人数：${escapeHtml(event.max_people)}</span>
+            <span>确认：${escapeHtml(formatVisionEventTime(event.acknowledged_at))}</span>
+            <span>结束原因：${escapeHtml(closeReason)}</span>
+            <span>指令投递：${escapeHtml(deliveryState)}</span>
+            ${errorMarkup}
+          </div>
+        `;
+
+        const snapshotFilename =
+          typeof event.snapshot_filename === "string"
+            ? event.snapshot_filename.trim()
+            : "";
+        const snapshotUrl =
+          typeof event.snapshot_url === "string"
+            ? event.snapshot_url.trim()
+            : "";
+
+        if (
+          snapshotFilename &&
+          snapshotUrl.startsWith("/static/vision_events/")
+        ) {
+          const link = document.createElement("a");
+          link.className = "vision-event-evidence";
+          link.textContent = "查看告警截图";
+          link.href = snapshotUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          item.appendChild(link);
+        }
+
+        list.appendChild(item);
+      });
+    }
+
+    async function refreshVisionEvents() {
+      try {
+        const response = await fetch("/api/vision/events", {
+          cache: "no-store"
+        });
+        const result = await readVisionResponse(
+          response,
+          "读取告警事件失败"
+        );
+        renderVisionEvents(result.events);
+      } catch (error) {
+        document.getElementById("visionEventList").innerHTML =
+          `<p class="vision-event-empty">${escapeHtml(error.message)}</p>`;
+      }
+    }
+
+    async function acknowledgeActiveVisionEvent() {
+      const button = document.getElementById("visionAckButton");
+      const eventId = Number(button.dataset.eventId);
+
+      if (!Number.isInteger(eventId) || eventId < 1) {
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        const response = await fetch(
+          `/api/vision/events/${eventId}/ack`,
+          { method: "POST" }
+        );
+        await readVisionResponse(response, "确认告警失败");
+        await Promise.all([
+          refreshVisionStatus(),
+          refreshVisionEvents()
+        ]);
+      } catch (error) {
+        document.getElementById("visionError").textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     function renderVisionStatus(status) {
       const dot = document.getElementById("visionStateDot");
       const stateText = document.getElementById("visionStateText");
       const errorText = document.getElementById("visionError");
+      const zoneState = ZONE_STATE_LABELS[status.zone_state]
+        ? status.zone_state
+        : "disabled";
+      const zoneStateBadge =
+        document.getElementById("visionZoneState");
+      const zoneColors = ZONE_STATE_COLORS[zoneState];
+      const activeEventId = status.active_event_id;
+      const activeAlert =
+        document.getElementById("visionActiveAlert");
+      const ackButton = document.getElementById("visionAckButton");
 
       document.getElementById("visionPeopleCount").textContent =
         status.people_count ?? "--";
@@ -1120,6 +1873,46 @@
         status.model_name || "--";
       document.getElementById("visionCameraIndex").textContent =
         status.camera_index ?? "--";
+      document.getElementById("visionPeopleInZone").textContent =
+        status.people_in_zone ?? 0;
+
+      zoneStateBadge.textContent = ZONE_STATE_LABELS[zoneState];
+      zoneStateBadge.style.color = zoneColors.color;
+      zoneStateBadge.style.backgroundColor = zoneColors.background;
+
+      const alarmActive = zoneState === "alarm_active";
+      document.getElementById("visionPanel").classList.toggle(
+        "zone-alarm",
+        alarmActive
+      );
+      activeAlert.classList.toggle("alarm", alarmActive);
+
+      if (activeEventId !== null && activeEventId !== undefined) {
+        activeAlert.firstElementChild.textContent = alarmActive
+          ? `事件 #${activeEventId} 正在告警`
+          : zoneState === "alarm_silenced"
+            ? `事件 #${activeEventId} 已确认静音`
+            : `活动事件 #${activeEventId}`;
+      } else {
+        activeAlert.firstElementChild.textContent = "当前无活动告警";
+      }
+
+      ackButton.hidden = !alarmActive || activeEventId === null ||
+        activeEventId === undefined;
+      if (!ackButton.hidden) {
+        ackButton.dataset.eventId = String(activeEventId);
+      } else {
+        delete ackButton.dataset.eventId;
+      }
+
+      if (!visionZoneEditing) {
+        const statusZone = copyNormalizedZone(status.zone);
+        if (status.zone === null || statusZone) {
+          savedVisionZone = statusZone;
+          document.getElementById("visionZoneDeleteButton").disabled =
+            !savedVisionZone;
+        }
+      }
 
       dot.className = "state-dot";
 
@@ -1140,7 +1933,24 @@
         stateText.textContent = "视觉服务异常";
       }
 
-      errorText.textContent = status.last_error || "";
+      errorText.textContent = [
+        status.last_error,
+        status.alarm_delivery_error
+      ].filter(Boolean).join("；");
+
+      const alarmChanged =
+        alarmActive &&
+        (
+          previousZoneState !== zoneState ||
+          previousActiveEventId !== activeEventId
+        );
+      previousZoneState = zoneState;
+      previousActiveEventId = activeEventId;
+      drawVisionZone();
+
+      if (alarmChanged) {
+        refreshVisionEvents();
+      }
     }
 
     async function refreshVisionStatus() {
@@ -1171,6 +1981,55 @@
       stream.src = `/api/vision/stream${separator}t=${Date.now()}`;
       document.getElementById("visionStateText").textContent =
         "正在重连画面";
+    }
+
+    function beginVisionZoneDrag(event) {
+      if (!visionZoneEditing) {
+        return;
+      }
+
+      const position = visionPointerPosition(event, true);
+      if (!position) {
+        document.getElementById("visionZoneMessage").textContent =
+          "请在实际画面内开始拖拽，黑边区域不可选。";
+        return;
+      }
+
+      visionDragStart = position;
+      draftVisionZone = null;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      document.getElementById("visionZoneSaveButton").disabled = true;
+      drawVisionZone();
+    }
+
+    function updateVisionZoneDrag(event) {
+      if (!visionZoneEditing || !visionDragStart) {
+        return;
+      }
+
+      const position = visionPointerPosition(event, false);
+      draftVisionZone = normalizedZoneFromDrag(
+        visionDragStart,
+        position
+      );
+      const valid = validNormalizedZone(draftVisionZone);
+      document.getElementById("visionZoneSaveButton").disabled = !valid;
+      document.getElementById("visionZoneMessage").textContent = valid
+        ? "区域大小有效，可以保存。"
+        : "区域宽度和高度均需至少为画面的2%。";
+      drawVisionZone();
+    }
+
+    function endVisionZoneDrag(event) {
+      if (!visionDragStart) {
+        return;
+      }
+
+      updateVisionZoneDrag(event);
+      visionDragStart = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
     }
 
     async function refreshEnvironmentData() {
@@ -1353,14 +2212,49 @@
       .addEventListener("click", reconnectVisionStream);
 
     document
+      .getElementById("visionZoneEditButton")
+      .addEventListener("click", () => setVisionZoneEditor(true));
+
+    document
+      .getElementById("visionZoneSaveButton")
+      .addEventListener("click", saveVisionZone);
+
+    document
+      .getElementById("visionZoneCancelButton")
+      .addEventListener("click", () => setVisionZoneEditor(false));
+
+    document
+      .getElementById("visionZoneDeleteButton")
+      .addEventListener("click", deleteVisionZone);
+
+    document
+      .getElementById("visionAckButton")
+      .addEventListener("click", acknowledgeActiveVisionEvent);
+
+    const visionZoneCanvas =
+      document.getElementById("visionZoneCanvas");
+    visionZoneCanvas.addEventListener("pointerdown", beginVisionZoneDrag);
+    visionZoneCanvas.addEventListener("pointermove", updateVisionZoneDrag);
+    visionZoneCanvas.addEventListener("pointerup", endVisionZoneDrag);
+    visionZoneCanvas.addEventListener("pointercancel", endVisionZoneDrag);
+
+    document
+      .getElementById("visionStream")
+      .addEventListener("load", drawVisionZone);
+
+    document
       .getElementById("visionStream")
       .addEventListener("error", () => {
         document.getElementById("visionError").textContent =
           "实时画面连接失败，请检查摄像头后点击重连画面";
       });
 
+    window.addEventListener("resize", drawVisionZone);
+
     refreshEnvironmentData();
     refreshVisionStatus();
+    refreshVisionZone();
+    refreshVisionEvents();
 
     setInterval(
       refreshEnvironmentData,
@@ -1370,6 +2264,11 @@
     setInterval(
       refreshVisionStatus,
       VISION_STATUS_INTERVAL
+    );
+
+    setInterval(
+      refreshVisionEvents,
+      VISION_EVENT_INTERVAL
     );
   </script>
 </body>
