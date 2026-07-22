@@ -239,6 +239,7 @@ def parse_env_message(msg: str) -> dict[str, Any]:
         "humidity_threshold": None,
         "manual_alarm": None,
         "humidity_silenced": None,
+        "vision_alarm": None,
         "state": None,
         "source": None,
     }
@@ -278,6 +279,10 @@ def parse_env_message(msg: str) -> dict[str, Any]:
             result["humidity_silenced"] = obj.get(
                 "humidity_silenced",
                 obj.get("humiditySilenced"),
+            )
+            result["vision_alarm"] = obj.get(
+                "vision_alarm",
+                obj.get("visionAlarm"),
             )
             result["state"] = obj.get("state")
             result["source"] = obj.get("source")

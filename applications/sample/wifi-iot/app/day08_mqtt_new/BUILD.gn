@@ -3,6 +3,7 @@
 static_library("day08_mqtt_new") {
     sources = [
         "day08_aht20.c",
+        "day08_alarm.c",
         "day08_entry.c",
         "mqtt.c",
     ]

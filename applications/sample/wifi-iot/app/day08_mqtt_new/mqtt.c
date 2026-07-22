@@ -1,4 +1,5 @@
 #include "day08_mqtt.h"
+#include "day08_alarm.h"
 #include "day08_config.h"
 
 #include <stdio.h>
@@ -42,8 +43,7 @@
 
 /* 2.0change */
 
-static volatile int g_manual_alarm_on = 0;
-static volatile int g_humidity_alarm_silenced = 0;
+static Day08AlarmState g_alarm_state = {0};
 static volatile int g_buzzer_is_on = 0;
 static int g_buzzer_initialized = 0;
 
@@ -121,48 +121,16 @@ static void Day08_SetBuzzer(int on)
 
 static void Day08_UpdateHumidityAlarm(float humidity)
 {
-    int humidity_over =
-        humidity > DAY08_HUMIDITY_THRESHOLD;
+    int was_silenced = g_alarm_state.humidity_silenced;
 
-    /*
-     * 湿度恢复正常：
-     * 解除人工静音，允许下一次超限时重新报警。
-     */
-    if (!humidity_over) {
-        if (g_humidity_alarm_silenced) {
-            printf("[day08][alarm] humidity recovered, "
-                   "manual silence cleared\n");
-        }
-
-        g_humidity_alarm_silenced = 0;
-
-        if (!g_manual_alarm_on) {
-            Day08_SetBuzzer(0);
-        }
-
-        return;
+    Day08Alarm_UpdateHumidity(&g_alarm_state, humidity,
+                              DAY08_HUMIDITY_THRESHOLD);
+    if (was_silenced && !g_alarm_state.humidity_silenced) {
+        printf("[day08][alarm] humidity recovered, "
+               "manual silence cleared\n");
     }
 
-    /*
-     * 网页人工开启报警时，持续响。
-     */
-    if (g_manual_alarm_on) {
-        Day08_SetBuzzer(1);
-        return;
-    }
-
-    /*
-     * 湿度超限期间，用户已经人工关闭。
-     */
-    if (g_humidity_alarm_silenced) {
-        Day08_SetBuzzer(0);
-        return;
-    }
-
-    /*
-     * 湿度大于40%，自动报警。
-     */
-    Day08_SetBuzzer(1);
+    Day08_SetBuzzer(Day08Alarm_ShouldBuzz(&g_alarm_state));
 }
 
 /* 2.0change */
@@ -227,25 +195,9 @@ static void Day08_MessageArrived(MessageData *data)
 
     /* 2.0change */
 
-    if (strcmp(payload, "alarm_on") == 0) {
-         printf("[day08][alarm] manual alarm ON\n");
-
-         g_manual_alarm_on = 1;
-         g_humidity_alarm_silenced = 0;
-
-        Day08_SetBuzzer(1);
-    } else if (strcmp(payload, "alarm_off") == 0) {
-        printf("[day08][alarm] manual alarm OFF\n");
-
-        g_manual_alarm_on = 0;
-
-    /*
-     * 湿度超限期间人工关闭后保持静音，
-     * 直到湿度恢复到40%及以下。
-     */
-        g_humidity_alarm_silenced = 1;
-
-        Day08_SetBuzzer(0);
+    if (Day08Alarm_ApplyCommand(&g_alarm_state, payload)) {
+        printf("[day08][alarm] command applied: %s\n", payload);
+        Day08_SetBuzzer(Day08Alarm_ShouldBuzz(&g_alarm_state));
     } else {
         printf("[day08][sub] unknown command: %s\n",
              payload);
@@ -317,6 +269,7 @@ int Day08_BuildTelemetryJson(char *buf, unsigned int len,
 
              "\"manual_alarm\":%d,"
              "\"humidity_silenced\":%d,"
+             "\"vision_alarm\":%d,"
              "\"state\":\"online\","
              "\"source\":\"aht20\""
              "}",
@@ -332,8 +285,9 @@ int Day08_BuildTelemetryJson(char *buf, unsigned int len,
             threshold100 / 100,
             threshold100 % 100,
 /* 2.0change */
-             g_manual_alarm_on,
-             g_humidity_alarm_silenced);
+             g_alarm_state.manual_alarm_on,
+             g_alarm_state.humidity_silenced,
+             g_alarm_state.vision_alarm_on);
 
     /* 2.0change */         
 
