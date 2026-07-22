@@ -5,13 +5,19 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
-from vision_service import VisionService, VisionSettings, build_mjpeg_chunk
+from vision_service import (
+    VisionService,
+    VisionSettings,
+    _default_capture_factory,
+    build_mjpeg_chunk,
+)
 
 
 class FakeBoxes:
@@ -52,6 +58,36 @@ class FakeCapture:
         self.released = True
 
 
+class ConfigurableFakeCapture(FakeCapture):
+    def __init__(self) -> None:
+        super().__init__()
+        self.set_calls = []
+
+    def set(self, prop, value) -> bool:
+        self.set_calls.append((prop, value))
+        return True
+
+
+class FakeCv2Module:
+    CAP_V4L2 = 200
+    CAP_PROP_FOURCC = 6
+    CAP_PROP_FRAME_WIDTH = 3
+    CAP_PROP_FRAME_HEIGHT = 4
+    CAP_PROP_BUFFERSIZE = 38
+
+    def __init__(self) -> None:
+        self.capture = ConfigurableFakeCapture()
+        self.open_args = None
+
+    def VideoCapture(self, *args):
+        self.open_args = args
+        return self.capture
+
+    @staticmethod
+    def VideoWriter_fourcc(*chars):
+        return "".join(chars)
+
+
 def fake_encoder(frame, _quality: int) -> bytes:
     return ("jpeg:" + str(frame)).encode("utf-8")
 
@@ -88,6 +124,23 @@ class VisionServiceTests(unittest.TestCase):
         self.assertEqual(status["people_count"], 0)
         self.assertEqual(status["frame_sequence"], 0)
         self.assertEqual(status["last_error"], "")
+
+    def test_linux_capture_uses_v4l2_and_mjpg(self):
+        service = self.make_service()
+        fake_cv2 = FakeCv2Module()
+
+        with (
+            patch.dict(sys.modules, {"cv2": fake_cv2}),
+            patch.object(sys, "platform", "linux"),
+        ):
+            capture = _default_capture_factory(service.settings)
+
+        self.assertIs(capture, fake_cv2.capture)
+        self.assertEqual(fake_cv2.open_args, (0, fake_cv2.CAP_V4L2))
+        self.assertIn(
+            (fake_cv2.CAP_PROP_FOURCC, "MJPG"),
+            fake_cv2.capture.set_calls,
+        )
 
     def test_process_frame_requests_person_only_and_updates_latest_jpeg(self):
         model = FakeModel()

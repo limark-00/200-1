@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -47,7 +48,16 @@ def _default_model_factory(model_name: str):
 def _default_capture_factory(settings: VisionSettings):
     import cv2
 
-    capture = cv2.VideoCapture(settings.camera_index)
+    if sys.platform.startswith("linux"):
+        # VMware/UVC 摄像头常会在 OpenCV 默认格式下读帧超时；
+        # 明确使用 V4L2 + MJPG，与 v4l2-ctl 可用视频流保持一致。
+        capture = cv2.VideoCapture(settings.camera_index, cv2.CAP_V4L2)
+        capture.set(
+            cv2.CAP_PROP_FOURCC,
+            cv2.VideoWriter_fourcc(*"MJPG"),
+        )
+    else:
+        capture = cv2.VideoCapture(settings.camera_index)
     capture.set(cv2.CAP_PROP_FRAME_WIDTH, settings.width)
     capture.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.height)
     capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
