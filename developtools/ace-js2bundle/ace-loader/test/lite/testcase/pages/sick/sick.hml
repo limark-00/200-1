@@ -1,0 +1,20 @@
+<list class="container" ref="list" onswipe="touchMove">
+    <list-item class="head_t">
+        <text class="head_t_b" style="margin-top:{{$t('css.measureHome_hand_top')}}; color:red; margin-left: {{marginLeft}}">{{$t('strings.choose_body_state')}}</text>
+    </list-item>
+    <list-item  class="list">
+        <text class="listL" style="width:{{$t('css.judgeIos_height')}};">{{$t('strings.chest_tightness')}}</text>
+    </list-item>
+    <list-item  class="list">
+        <text class="listL" style="width:{{$t('css.judgeIos_height')}};color:{{dizzinessColor}}">{{$t('strings.dizziness')}}</text>
+    </list-item>
+    <list-item  class="list">
+        <text class="listL" style="width:{{$t('css.judgeIos_height')}};">{{$t('strings.dizziness')}} :头痛</text>
+    </list-item>
+    <list-item  class="list">
+        <text class="listL" style="width:{{$t('css.judgeIos_height')}};">{{$t('strings.chest_tightness')}} + {{$t('strings.dizziness')}}</text>
+    </list-item>
+    <list-item class="buttonContainerStyle">
+        <input type="button" class="buttonStyle" value="下一页" onclick="change"/>
+    </list-item>
+</list>

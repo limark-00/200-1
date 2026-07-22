@@ -1,0 +1,31 @@
+<div>
+  <!-- expression_Compiler_Test_001 -->
+  <text>
+    {{ti || subTitle}}
+  </text>
+
+  <!-- expression_Compiler_Test_002 -->
+  <text>
+    {{ti && subTitle}}
+  </text>
+
+  <!-- expression_Compiler_Test_003 -->
+  <div>
+    {{isArrived === 'arrived' && isTravel === false}}
+  </div>
+
+  <!-- expression_Compiler_Test_004 -->
+  <div>
+    {{isArrived === 'arrived' || isTravel === false}}
+  </div>
+
+  <!-- expression_Compiler_Test_005 -->
+  <div>
+    {{!flag}}
+  </div>
+
+  <!-- expression_Compiler_Test_006 -->
+  <div>
+    {{!!flag}}
+  </div>
+</div>

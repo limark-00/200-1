@@ -1,0 +1,25 @@
+/* media query import css */
+@import '../../common/media.css';
+
+@media (dark-mode:true) {
+  @import "../../common/common.css";
+  .container {
+    width: 500px;
+    height: 500px;
+    background-color: #fa8072;
+  }
+
+  .title {
+    font-size: 16px;
+    color: #333333;
+    align-items: center;
+  }
+
+  .button {
+    padding-top: 50px;
+    font-size: 16px;
+    color: #666666;
+    align-items: center;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {},
+    "classList": [
+      "container"
+    ],
+    "children": [
+      {
+        "type": "text",
+        "attr": {
+          "value": "{{content}}"
+        }
+      }
+    ]
+  },
+  "actions": {},
+  "styles": {},
+  "data": {
+    "content": "Hello World!"
+  },
+  "apiVersion": {}
+}

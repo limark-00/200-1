@@ -1,0 +1,34 @@
+<div class="container">
+  <!-- shareid_test_1 -->
+  <div shareid="abc">shareid_test1</div>
+
+  <!-- shareid_test_2 -->
+  <div shareid="{{aa}}">shareid_test2</div>
+
+  <!-- voicelabel_test -->
+  <div voicelabel="fff">voicelabel_test</div>
+
+  <!-- subscriptlabel_test -->
+  <div subscriptlabel="aaa">subscriptlabel_test</div>
+
+  <!-- scenelabel_test -->
+  <div scenelabel="video">scenelabel_test</div>
+
+  <!-- subscriptflag_test -->
+  <div subscriptflag="auto">subscriptflag_test</div>
+
+  <!-- accessibilitygroup_test_1 -->
+  <div accessibilitygroup="true">accessibilitygroup_test1</div>
+
+  <!-- accessibilitygroup_test_2 -->
+  <div accessibilitygroup="{{accessibilitygroup}}">accessibilitygroup_test2</div>
+
+  <!-- accessibilitydescription_test -->
+  <div accessibilitydescription="bbb">accessibilitydescription_test</div>
+
+  <!-- accessibilitytext_test -->
+  <div accessibilitytext="ccc">accessibilitytext_test</div>
+
+  <!-- accessibilityimportance_test -->
+  <div accessibilityimportance="auto">accessibilityimportance_test</div>
+</div>

@@ -1,0 +1,22 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {
+      "value": "importCSS_test"
+    },
+    "classList": [
+      "container"
+    ]
+  },
+  "styles": {
+    ".title": {
+      "fontSize": "50px"
+    },
+    ".container": {
+      "justifyContent": "center"
+    }
+  },
+  "apiVersion": {},
+  "actions": {},
+  "data": {}
+}

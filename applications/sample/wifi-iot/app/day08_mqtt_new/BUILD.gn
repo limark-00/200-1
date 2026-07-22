@@ -1,0 +1,39 @@
+# AHT20 temperature/humidity -> Wi-Fi -> Bemfa MQTT.
+
+static_library("day08_mqtt_new") {
+    sources = [
+        "day08_aht20.c",
+        "day08_entry.c",
+        "mqtt.c",
+    ]
+
+    include_dirs = [
+        ".",
+        "//utils/native/lite/include",
+        "//kernel/liteos_m/components/cmsis/2.0",
+
+        # Newer OpenHarmony IoT peripheral API.
+        "//base/iot_hardware/peripheral/interfaces/kits",
+
+        # OpenHarmony 1.x / Hi3861 WiFi-IoT Lite API.
+        "//base/iot_hardware/interfaces/kits/wifiiot_lite",
+
+        "//device/soc/hisilicon/hi3861v100/hi3861_adapter/hals/communication/wifi_lite/wifiservice",
+        "//device/soc/hisilicon/hi3861v100/hi3861_adapter/kal",
+# change.
+        "//device/soc/hisilicon/hi3861v100/sdk_liteos/include",
+# change.
+        "//device/soc/hisilicon/hi3861v100/sdk_liteos/third_party/lwip_sack/include",
+
+        "//third_party/pahomqtt/MQTTPacket/src",
+        "//third_party/pahomqtt/MQTTClient-C/src",
+        "//third_party/pahomqtt/MQTTClient-C/src/liteOS",
+
+        "//applications/sample/wifi-iot/app/wifi_core",
+    ]
+
+    deps = [
+        "//applications/sample/wifi-iot/app/wifi_core:wifi_core",
+        "//third_party/pahomqtt:pahomqtt_static",
+    ]
+}

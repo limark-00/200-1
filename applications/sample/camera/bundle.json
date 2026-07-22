@@ -1,0 +1,58 @@
+{
+    "name": "@ohos/applications_sample_camera",
+    "version": "",
+    "description": "图库，相机，设置等系统应用示例代码",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "Apache V2",
+    "repository": "https://gitee.com/openharmony/applications_sample_camera",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "applications"
+    ],
+    "keywords": [
+        "applications",
+        "sample",
+        "camera"
+    ],
+    "envs": [],
+    "dirs": [],
+    "author": {
+        "name": "",
+        "email": "",
+        "url": ""
+    },
+    "contributors": [
+        {
+            "name": "",
+            "email": "",
+            "url": ""
+        }
+    ],
+    "segment": {
+        "destPath": "applications/sample/camera"
+    },
+    "component": {
+        "name": "camera_sample_app",
+        "subsystem": "sample",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [
+            "small"
+        ],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}

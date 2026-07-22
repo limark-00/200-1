@@ -1,0 +1,43 @@
+.container {
+  justify-content: center;
+  align-items: center;
+}
+
+.title {
+  font-size: 50px;
+}
+
+.button-div {
+  padding-top: 50px;
+  align-items: center;
+  justify-content: center;
+}
+
+.text-div {
+  align-items: center;
+  justify-content: center;
+}
+
+.button {
+  font-size: 30px;
+}
+
+.animate {
+  transform-origin: 20% 40%;
+  transform: translate(0px) ;
+  animation-name: myfirst;
+    animation-delay: 2s;
+    animation-duration: 5s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    animation-fill-mode: none;
+}
+@keyframes Go
+{
+  from {
+    transform:translate(0px) rotate(0deg) scale(1.0);
+  }
+  to {
+    transform-style:translate(100px) rotate(180deg) scale(2.0);
+  }
+}

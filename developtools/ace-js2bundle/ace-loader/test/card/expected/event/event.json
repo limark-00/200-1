@@ -1,0 +1,37 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {},
+    "children": [
+      {
+        "type": "div",
+        "attr": {},
+        "events": {
+          "click": "router"
+        }
+      },
+      {
+        "type": "div",
+        "attr": {},
+        "events": {
+          "click": "router"
+        }
+      }
+    ]
+  },
+  "styles": {},
+  "actions": {
+    "click": {
+      "action": "router",
+      "bundleName": "com.example.helloworld",
+      "abilityName": "com.example.helloworld.MainAbility",
+      "params": {
+        "day": "$event.day",
+        "time": "$event.time",
+        "year": "$event.year"
+        }
+    }
+  },
+  "data": {},
+  "apiVersion": {}
+}

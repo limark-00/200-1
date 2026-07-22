@@ -1,0 +1,54 @@
+<div>
+  <!-- For_Compiler_Test_001 -->
+  <div for="{{list}}" onclick="test($item)">
+    <text>{{$idx}}.{{$item.name}}</text>
+  </div>
+
+  <!-- For_Compiler_Test_002 -->
+  <div>
+    <div for="personItem in list" onclick="test($idx)">
+      <text>{{$idx}}-{{personItem.name}}--{{personItem.age}}</text>
+    </div>
+    <image src="{{personItem}}" />
+  </div>
+
+  <!-- For_Compiler_Test_003 -->
+  <div>
+    <div for="(personIndex, personItem) in list" onclick="test(personItem)">
+      <text>{{personIndex}}.{{personItem.name}}</text>
+    </div>
+    <swiper index="{{personIndex}}" loop="{{personItem}}"></swiper>
+  </div>
+
+  <!-- For_Compiler_Test_004 -->
+  <div for="(personIndex, personItem) in list" onclick="test(personItem)">
+    <div for="(index,item) in menu">
+      <text>{{personItem.id}}--{{item.name}}</text>
+    </div>
+  </div>
+
+  <!-- For_Compiler_Test_005 -->
+  <div for="(personIndex, personItem) in list" onclick="test(personItem)">
+    <div for="(index,item) in personItem">
+      <text>{{index}}--{{item.name}}</text>
+    </div>
+  </div>
+
+
+  <!-- For_Compiler_Test_006 -->
+  <div for="(personIndex, personItem) in list" onclick="test(personItem)">
+    <div onclick="{{personItem.click}}">
+      {{personIndex}}.{{personItem.name}}
+    </div>
+  </div>
+
+  <!-- For_Compiler_Test_007 -->
+  <div for="(value, index) in value.list" onclick="test(value)">
+    <div onclick="{{value.click}}">{{value.info}}</div>
+  </div>
+
+  <!-- For_Compiler_Test_008 -->
+  <div for="shrinkClass in flexShrinkClass" onclick="test(value)">
+    <div onclick="{{value.click}}">{{value.info}}</div>
+  </div>
+</div>

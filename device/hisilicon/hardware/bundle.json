@@ -1,0 +1,56 @@
+{
+    "name": "@ohos/device_hisilicon_hardware",
+    "version": "",
+    "description": "Chip interconnection layer for media features | 媒体特性芯片对接层库",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "End User License Agreement",
+    "repository": "https://gitee.com/openharmony/device_hisilicon_hardware",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "device"
+    ],
+    "keywords": [
+        "device",
+        "hisilicon",
+        "hardware"
+    ],
+    "envs": [],
+    "dirs": [],
+    "author": {
+        "name": "",
+        "email": "",
+        "url": ""
+    },
+    "contributors": [
+        {
+            "name": "",
+            "email": "",
+            "url": ""
+        }
+    ],
+    "segment": {
+        "destPath": "device/hisilicon/hardware"
+    },
+    "component": {
+        "name": "device_hisilicon_hardware",
+        "subsystem": "",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}

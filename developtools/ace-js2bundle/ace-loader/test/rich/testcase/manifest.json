@@ -1,0 +1,22 @@
+{
+  "appID": "com.example.ace.helloworld",
+  "appName": "HelloAce",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "minPlatformVersion": "5.0.0",
+  "pages": [
+    "pages/class/class",
+    "pages/event/event",
+    "pages/expression/expression",
+    "pages/commonAttr/commonAttr",
+    "pages/uncommonAttr/uncommonAttr",
+    "pages/privateAttr/privateAttr",
+    "pages/ifDirective/ifDirective",
+    "pages/forDirective/forDirective",
+    "pages/importJS/importJS",
+    "pages/inlineStyle/inlineStyle",
+    "pages/exteriorStyle/exteriorStyle",
+    "pages/importCSS/importCSS",
+    "pages/mediaQuery/mediaQuery"
+  ]
+}

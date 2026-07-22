@@ -1,0 +1,23 @@
+div {
+  flex-direction: column;
+}
+
+.title {
+  font-size: 30px;
+}
+
+#contentId {
+  font-size: 20px;
+}
+
+.title, .content {
+  padding: 5px;
+}
+
+.container text {
+  color: #007dff;
+};
+
+.container > text {
+  color: #fa2a2d;
+}

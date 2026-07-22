@@ -1,0 +1,17 @@
+<div>
+  <!-- attribute_Compiler_Test_001 -->
+  <slider max="100"></slider>
+
+  <!-- attribute_Compiler_Test_002 -->
+  <image/>
+
+  <!-- attribute_Compiler_Test_003 -->
+  <div key="day">hello</div>
+
+  <!-- attribute_Compiler_Test_004 -->
+  <text>hello</text>
+
+  <!-- attribute_Compiler_Test_005 -->
+  <text>{{num}}</text>
+</div>
+

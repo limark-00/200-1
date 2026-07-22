@@ -1,0 +1,14 @@
+{
+  "actions": {
+    "click":{
+      "action":"router",
+      "bundleName": "com.example.helloworld",
+      "abilityName": "com.example.helloworld.MainAbility",
+      "params": {
+        "day": "$event.day",
+        "year": "$event.year",
+        "time": "$event.time"
+      }
+    }
+  }
+}

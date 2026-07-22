@@ -1,0 +1,29 @@
+
+The definitions of some interfaces implemented in jsapi/api/js_url.cpp are released under Mozilla license.
+
+The definitions and functions of these interfaces are consistent with the standard interfaces under mozila license,
+but the implementation of specific functions is independent and self-developed. 
+
+All interfaces are described in d.ts, the following is the interface written in d.ts under to Mozilla license
+
+class TextDecoder {
+    readonly encoding: string;
+    readonly fatal: boolean;
+    readonly ignoreBOM = false;
+    constructor(
+        encoding?: string,
+        options?: { fatal?: boolean; ignoreBOM?: boolean },
+    );
+    decode(input: Uint8Array, options?: { stream?: false }): string;
+}
+
+class TextEncoder {
+
+    readonly encoding = "utf-8";
+    constructor();
+    encode(input?: string): Uint8Array;
+    encodeInto(
+        input: string,
+        dest: Uint8Array,
+    ): { read: number; written: number };
+}

@@ -1,0 +1,16 @@
+<div class="container">
+  <!-- class_test_1 -->
+  <div class="title">class_test1</div>
+
+  <!-- class_test_2 -->
+  <div class="title table">class_test2</div>
+
+  <!-- class_test_3 -->
+  <div class="{{flag ? 'item' : 'item-selected'}}">class_test3</div>
+
+  <!-- class_test_4 -->
+  <div class="{{a}}    {{c}}">class_test4</div>
+
+  <!-- class_test_5 -->
+  <div class="{{$idx}}{{d}} + {{$item.id}} aa">class_test5</div>
+</div>

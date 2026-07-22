@@ -1,0 +1,87 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {
+      "value": "exteriorStyle_test"
+    }
+  },
+  "styles": {
+    ".a": {
+      "width": "100%",
+      "height": "50%"
+    },
+    ".b": {
+      "width": "100px",
+      "height": "200px"
+    },
+    ".c": {
+      "color": "#808080"
+    },
+    ".d": {
+      "color": "#008000"
+    },
+    ".e": {
+      "color": "rgba(80,60,150,1)"
+    },
+    ".j": {
+      "gridTemplateColumns": "50px 40px 80px"
+    },
+    ".l": {
+      "gridRowStart": 3
+    },
+    ".m": {
+      "borderTopWidth": "5px",
+      "borderRightWidth": "5px",
+      "borderBottomWidth": "5px",
+      "borderLeftWidth": "5px",
+      "borderStyle": "solid",
+      "borderTopColor": "#808080",
+      "borderRightColor": "#808080",
+      "borderBottomColor": "#808080",
+      "borderLeftColor": "#808080"
+    },
+    ".n": {
+      "textIndent": "50px"
+    },
+    ".o": {
+      "backgroundImage": "/common/img/a.jpg"
+    },
+    ".t": {
+      "startAngle": "240deg"
+    },
+    ".v": {
+      "paddingTop": "10px",
+      "paddingRight": "15px",
+      "paddingBottom": "10px",
+      "paddingLeft": "15px"
+    },
+    "#w": {
+      "fontSize": "15px",
+      "fontFamily": "PingFangSC-Regular"
+    },
+    ".gradient1": {
+      "background": "{\"values\":[{\"type\":\"linearGradient\",\"directions\":[\"to\",\"bottom\"],\"values\":[\"#ff0000\",\"#00ff00\"]}]}"
+    },
+    ".gradient2": {
+      "background": "{\"values\":[{\"type\":\"linearGradient\",\"directions\":[\"45deg\"],\"values\":[\"rgb(255,0,0)\",\"rgb(0,255,0)\"]}]}"
+    },
+    ".gradient3": {
+      "background": "{\"values\":[{\"type\":\"linearGradient\",\"directions\":[\"to\",\"right\"],\"values\":[\"rgb(255,0,0) 90px\",\"rgb(0,0,255) 60%\"]}]}"
+    },
+    ".gradient4": {
+      "background": "{\"values\":[{\"type\":\"repeatingLinearGradient\",\"directions\":[\"to\",\"right\"],\"values\":[\"rgba(255,255,0,1) 30px\",\"rgba(0,0,255,0.5) 60px\"]}]}"
+    },
+    "@FONT-FACE": [
+      {
+        "fontFamily": "HWfont",
+        "src": "url(/common/HWfont.ttf)"
+      }
+    ],
+    ".txt": {
+      "fontFamily": "HWfont"
+    }
+  },
+  "actions": {},
+  "data": {},
+  "apiVersion": {}
+}

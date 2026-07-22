@@ -1,0 +1,40 @@
+<div class="container">
+  <!-- id_test_1 -->
+  <div id="abc">id_test1</div>
+
+  <!-- id_test_2 -->
+  <div id="{{aa}}">id_test2</div>
+
+  <!-- ref_test -->
+  <div ref="ref">ref_test</div>
+
+  <!-- disabled_test_1 -->
+  <div disabled="true">disabled_test1</div>
+
+  <!-- disabled_test_2 -->
+  <div disabled="{{disabled}}">disabled_test2</div>
+
+  <!-- tid_test_1 -->
+  <div tid="def">tid_test1</div>
+
+  <!-- tid_test_2 -->
+  <div tid="{{bb}}">tid_test2</div>
+
+  <!-- show_test_1 -->
+  <div show="true">show_test1</div>
+
+  <!-- show_test_2 -->
+  <div show="{{showTest}}">show_test2</div>
+
+  <!-- data_test_1 -->
+  <div data="abd">data_test1</div>
+
+  <!-- data_test_2 -->
+  <div data="{{data}}">data_test2</div>
+
+  <!-- focusable_test_1 -->
+  <div focusable="true">focusable_test1</div>
+
+  <!-- focusable_test_2 -->
+  <div focusable="{{focusable}}">focusable_test2</div>
+</div>

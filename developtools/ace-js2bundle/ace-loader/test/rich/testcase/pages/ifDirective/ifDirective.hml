@@ -1,0 +1,38 @@
+<div>
+  <!-- If_Compiler_Test_001 -->
+  <text if="{{conditionVar === 1}}">{{componentData.if}}</text>
+
+  <!-- If_Compiler_Test_002 -->
+  <div class="item-content">
+    <text if="{{conditionVar === 1}}">{{componentData.if}}</text>
+    <text elif="{{conditionVar === 2}}">{{componentData.elif}}</text>
+    <text else>{{componentData.else}}</text>
+  </div>
+
+  <!-- If_Compiler_Test_003 -->
+  <div if="{{showTest}}">
+    <div for="{{list}}">
+      <text>{{$idx}}.{{$item.name}}</text>
+    </div>
+  </div>
+
+  <!-- If_Compiler_Test_004 -->
+  <div for="{{list}}">
+    <div if="{{!showTest}}">
+      <text>{{$idx}}.{{$item.name}}</text>
+    </div>
+  </div>
+
+  <!-- If_Compiler_Test_005 -->
+  <div for="(personIndex, personItem) in list">
+    <div if="{{personIndex==1}}">
+      <text>{{personItem.name}}</text>
+    </div>
+  </div>
+
+  <!-- If_Compiler_Test_006 -->
+  <div if="{{(num1 > num2) ? true_value : false_value}}">
+    <text>{{true_value}}</text>
+  </div>
+
+</div>

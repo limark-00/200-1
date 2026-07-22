@@ -1,0 +1,117 @@
+# Copyright (c) 2021 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build/ohos.gni")
+import("//build/ohos/ace/ace.gni")
+import("//foundation/ace/ace_engine/ace_config.gni")
+
+ets_loader_lib_dir =
+    get_label_info(":build_ets_loader_library", "target_out_dir") + "/lib"
+ets_loader_declarations_dir = get_label_info(":build_ets_loader_library",
+                                             "target_out_dir") + "/declarations"
+ets_loader_component_config_file =
+    get_label_info(":build_ets_loader_library", "target_out_dir") +
+    "/component_config.json"
+
+action("build_ets_loader_library") {
+  script = "//developtools/ace-ets2bundle/build_ets_loader_library.py"
+  depfile = "$target_gen_dir/$target_name.d"
+  outputs = [
+    ets_loader_lib_dir,
+    ets_loader_declarations_dir,
+    ets_loader_component_config_file,
+  ]
+
+  _ets_loader_dir = "//developtools/ace-ets2bundle/compiler"
+  _declarations_file_dir = "//interface/sdk-js/api/@internal/component/ets"
+
+  _babel_js = _ets_loader_dir + "/node_modules/@babel/cli/bin/babel.js"
+  _babel_config_js = _ets_loader_dir + "/babel.config.js"
+  _uglify_source_js = _ets_loader_dir + "/uglify-source.js"
+  _build_declarations_file_js = _ets_loader_dir + "/build_declarations_file.js"
+
+  inputs = [
+    _babel_config_js,
+    _babel_js,
+    _uglify_source_js,
+    _build_declarations_file_js,
+  ]
+
+  # different host platform nodejs tool directory
+  if (host_os == "linux") {
+    nodejs_path =
+        "//prebuilts/build-tools/common/nodejs/node-v12.18.4-linux-x64/bin/node"
+  } else if (host_os == "mac") {
+    nodejs_path =
+        "//prebuilts/build-tools/common/nodejs/node-v12.18.4-darwin-x64/bin/node"
+  } else {
+    assert(false, "Unsupported host_os: $host_os")
+  }
+
+  args = [
+    "--depfile",
+    rebase_path(depfile, root_build_dir),
+    "--node",
+    rebase_path(nodejs_path, root_build_dir),
+    "--babel-js",
+    rebase_path(_babel_js, root_build_dir),
+    "--ets-loader-src-dir",
+    rebase_path(_ets_loader_dir + "/src", root_build_dir),
+    "--babel-config-js",
+    rebase_path(_babel_config_js, root_build_dir),
+    "--uglify-source-js",
+    rebase_path(_uglify_source_js, root_build_dir),
+    "--output-dir",
+    rebase_path(ets_loader_lib_dir, root_build_dir),
+    "--declarations-file-dir",
+    rebase_path(_declarations_file_dir, root_build_dir),
+    "--build-declarations-file-js",
+    rebase_path(_build_declarations_file_js, root_build_dir),
+    "--output-declarations-dir",
+    rebase_path(ets_loader_declarations_dir, root_build_dir),
+    "--output-component-config-file",
+    rebase_path(ets_loader_component_config_file, root_build_dir),
+  ]
+}
+
+ohos_copy("ets_loader") {
+  deps = [ ":build_ets_loader_library" ]
+  sources = [
+    "compiler/main.js",
+    "compiler/npm-install.js",
+    "compiler/package-lock.json",
+    "compiler/package.json",
+    "compiler/tsconfig.json",
+    "compiler/webpack.config.js",
+    ets_loader_component_config_file,
+  ]
+  outputs = [ target_out_dir + "/$target_name/{{source_file_part}}" ]
+  module_source_dir = target_out_dir + "/$target_name"
+  module_install_name = ""
+}
+
+ohos_copy("ets_loader_library") {
+  deps = [ ":build_ets_loader_library" ]
+  sources = [ ets_loader_lib_dir ]
+  outputs = [ target_out_dir + "/$target_name" ]
+  module_source_dir = target_out_dir + "/$target_name"
+  module_install_name = ""
+}
+
+ohos_copy("ets_loader_declaration") {
+  deps = [ ":build_ets_loader_library" ]
+  sources = [ ets_loader_declarations_dir ]
+  outputs = [ target_out_dir + "/$target_name" ]
+  module_source_dir = target_out_dir + "/$target_name"
+  module_install_name = ""
+}

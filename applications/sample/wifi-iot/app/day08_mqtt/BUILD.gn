@@ -1,0 +1,28 @@
+# Day08 MQTT gold-sample implementation (new folder).
+# Depends on wifi_core; does not modify mqtt_test / demo_wifi_sta.
+
+static_library("day08_mqtt") {
+    sources = [
+        "day08_entry.c",
+        "day08_mqtt.c",
+    ]
+
+    include_dirs = [
+        "//utils/native/lite/include",
+        "//kernel/liteos_m/components/cmsis/2.0",
+        "//base/iot_hardware/peripheral/interfaces/kits",
+        "//device/soc/hisilicon/hi3861v100/hi3861_adapter/hals/communication/wifi_lite/wifiservice",
+        "//device/soc/hisilicon/hi3861v100/hi3861_adapter/kal",
+        "//device/soc/hisilicon/hi3861v100/sdk_liteos/third_party/lwip_sack/include",
+        "//third_party/pahomqtt/MQTTPacket/src",
+        "//third_party/pahomqtt/MQTTClient-C/src",
+        "//third_party/pahomqtt/MQTTClient-C/src/liteOS",
+        "//applications/sample/wifi-iot/app/wifi_core",
+        "//applications/sample/wifi-iot/app/day08_mqtt",
+    ]
+
+    deps = [
+        "//applications/sample/wifi-iot/app/wifi_core:wifi_core",
+        "//third_party/pahomqtt:pahomqtt_static",
+    ]
+}

@@ -1,0 +1,56 @@
+{
+    "name": "@ohos/developtools_ace_js2bundle",
+    "version": "",
+    "description": "Provides syntax compilation, conversion, syntax verification, and user-friendly syntax error prompts. | 提供类Web范式的语法编译转换、语法验证，丰富友好的语法报错提示。",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "Apache V2",
+    "repository": "https://gitee.com/openharmony/developtools_ace-js2bundle",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "developtools"
+    ],
+    "keywords": [
+        "developtools",
+        "ace",
+        "js2bundle"
+    ],
+    "envs": {},
+    "dirs": {},
+    "author": {
+        "name": "",
+        "email": "",
+        "url": ""
+    },
+    "contributors": [
+        {
+            "name": "",
+            "email": "",
+            "url": ""
+        }
+    ],
+    "segment": {
+        "destPath": "developtools/ace-js2bundle"
+    },
+    "component": {
+        "name": "developtools_ace-js2bundle",
+        "subsystem": "",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}

@@ -1,0 +1,73 @@
+<div class="container">
+  <!-- PERCENTAGE_LENGTH_VALIDATOR_test -->
+  <div style="width: 100%;">style_test1</div>
+
+  <!-- LENGTH_VALIDATOR_test -->
+  <div style="height: {{height}}">style_test2</div>
+
+  <!-- COLOR_VALIDATOR_test_1 -->
+  <div style="color: #008000;">style_test3</div>
+
+  <!-- COLOR_VALIDATOR_test_2 -->
+  <div style="color: red;">style_test4</div>
+
+  <!-- COLOR_VALIDATOR_test_3 -->
+  <div style="color: rgba(200, 180, 120, 1.0);">style_test5</div>
+
+  <!-- TIME_VALIDATOR_test -->
+  <div style="animation-duration: 400ms;">style_test6</div>
+
+  <!-- ITERATIONCOUNT_VALIDATOR_test -->
+  <div style="animation-iteration-count: 4;">style_test7</div>
+
+  <!-- TRANSITION_TIMING_FUNCTION_VALIDATOR_test -->
+  <div style="animation-timing-function: linear;">style_test8</div>
+
+  <!-- EnumValidator_test -->
+  <div style="animation-fill-mode: forwards;">style_test9</div>
+
+  <!-- GRID_TEMPLATE_VALIDATOR_test -->
+  <div style="grid-template-columns: 50px 100px 60px;">style_test10</div>
+
+  <!-- NUMBER_VALIDATOR_test -->
+  <div style="grid-row-start: 2;">style_test11</div>
+
+  <!-- BORDER_VALIDATOR_test -->
+  <div style="border: 5px solid #FF0000;">style_test12</div>
+
+  <!-- TEXT_INDENT_VALIDATOR_test -->
+  <div style="text-indent: 50px;">style_test13</div>
+
+  <!-- URL_VALIDATOR_test_1 -->
+  <div style="background-image: url(/common/img/xmad.jpg);">style_test14</div>
+
+  <!-- TRANSITION_PROPERTY_VALIDATOR_test -->
+  <div style="transition-property: width;">style_test15</div>
+
+  <!-- TRANSITION_INTERVAL_VALIDATOR_test -->
+  <div style="transition-duration: 5s;">style_test16</div>
+
+  <!-- TRANSFORM_VALIDATOR_test -->
+  <div style="transform: rotate(7deg);">style_test17</div>
+
+  <!-- TRANSFORM_ORIGIN_VALIDATOR_test -->
+  <div style="transform-origin: 20% 40%;">style_test18</div>
+
+  <!-- ANGLE_VALIDATOR_test -->
+  <progress style="start-angle: 240deg;">style_test19</progress>
+
+  <!-- ANYTHING_VALIDATOR_test -->
+  <picker-view style="selected-font-family: PingFangSC-Regular;">style_test20</picker-view>
+
+  <!-- SHORTHAND_LENGTH_VALIDATOR_test -->
+  <div style="padding: 10px 15px;">style_test21</div>
+
+  <!-- THREE-STAGE_STYLE_test -->
+  <div style="display:{{isFullWindow?'flex':'none'}}">style_test22</div>
+
+  <!-- URL_VALIDATOR_test_2 -->
+  <div style="background-image: url('https://huawei.com/logo.jpg');">style_test23</div>
+
+  <!-- DATA_BINDING_test_2 -->
+  <text style="width:{{1 === count? test(prop):'300px'}}">This is the index page.</text>
+</div>

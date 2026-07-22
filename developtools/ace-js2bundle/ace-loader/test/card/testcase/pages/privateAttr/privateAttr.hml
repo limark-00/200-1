@@ -1,0 +1,19 @@
+<div class="container">
+  <!-- image_test -->
+  <image alt="img" src="{{src}}"></image>
+
+  <!-- progress_test_1 -->
+  <progress type="horizontal" percent="{{percent}}" secondarypercent="{{secondarypercent}}"></progress>
+
+  <!-- progress_test_2 -->
+  <progress type="scale-ring" percent="{{percent}}" secondarypercent="{{secondarypercent}}" clockwise="{{clockwise}}"></progress>
+
+  <!-- progress_test_3 -->
+  <progress type="arc" percent="{{percent}}"></progress>
+
+  <!-- chart_test -->
+  <chart type="line" options="{{options}}" datasets="{{datasets}}"></chart>
+
+  <!-- button_test -->
+  <button type="capsule" value="{{value}}" icon="{{icon}}" value="{{value}}"></button>
+</div>

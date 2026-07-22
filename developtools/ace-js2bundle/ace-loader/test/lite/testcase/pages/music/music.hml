@@ -1,0 +1,15 @@
+<div class="wrapper">
+    <div class="music-list-item" for="{{value in musics}}">
+        <div style="height:400px;width:454px;flex-direction:column;">
+            <text class="content">{{$t('value.name')}}
+            </text>
+            <text class="content">{{value.name}}
+            </text>
+            <text class="content">{{$t('strings.dizziness')}}
+            </text>
+            <text class="content">{{value.singer}}
+            </text>
+        </div>
+    </div>
+</div>
+

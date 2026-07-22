@@ -1,0 +1,21 @@
+{
+  "appID": "com.example.ace.helloworld",
+  "appName": "HelloAce",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "minPlatformVersion": "zsdk 1.0.0",
+  "pages": [
+    "pages/attribute/attribute",
+    "pages/bubble/bubble",
+    "pages/class/class",
+    "pages/event/event",
+    "pages/expression/expression",
+    "pages/exteriorStyle/exteriorStyle",
+    "pages/forDirective/forDirective",
+    "pages/ifDirective/ifDirective",
+    "pages/importJS/importJS",
+    "pages/inlineStyle/inlineStyle",
+    "pages/music/music",
+    "pages/sick/sick"
+  ]
+}

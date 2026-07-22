@@ -1,0 +1,18 @@
+# wifi_core: shared STA connect module for wifi-iot classroom samples.
+# SSID/password live only in wifi_app_config.h
+
+static_library("wifi_core") {
+    sources = [
+        "wifi_connect.c",
+    ]
+
+    include_dirs = [
+        "//utils/native/lite/include",
+        "//kernel/liteos_m/components/cmsis/2.0",
+        "//base/iot_hardware/peripheral/interfaces/kits",
+        "//device/soc/hisilicon/hi3861v100/hi3861_adapter/hals/communication/wifi_lite/wifiservice",
+        "//device/soc/hisilicon/hi3861v100/hi3861_adapter/kal",
+        "//device/soc/hisilicon/hi3861v100/sdk_liteos/third_party/lwip_sack/include",
+        "//applications/sample/wifi-iot/app/wifi_core",
+    ]
+}

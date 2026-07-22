@@ -1,0 +1,31 @@
+<div>
+  <!-- inlineStyle_Compiler_Test_001 -->
+  <div style="width: 10px;"></div>
+
+  <!-- inlineStyle_Compiler_Test_002 -->
+  <div style="height:{{num}}"></div>
+
+  <!-- inlineStyle_Compiler_Test_003 -->
+  <text style="color: #c71585;"></text>
+
+  <!-- inlineStyle_Compiler_Test_004 -->
+  <div style="color: lightcyan;"></div>
+
+  <!-- inlineStyle_Compiler_Test_005 -->
+  <div style="animation-delay: 900ms;"></div>
+
+  <!-- inlineStyle_Compiler_Test_006 -->
+  <div style="animation-duration: 200ms;"></div>
+
+  <!-- inlineStyle_Compiler_Test_007 -->
+  <div style="animation-iteration-count: infinite;"></div>
+
+  <!-- inlineStyle_Compiler_Test_008 -->
+  <div style="animation-iteration-count: 1000;"></div>
+
+  <!-- inlineStyle_Compiler_Test_009 -->
+  <div style="background-image: url(/common/img/xmad.jpg);"></div>
+
+  <!-- inlineStyle_Compiler_Test_010 -->
+  <div style="background-image: url('/common/img/map.jpg');"></div>
+</div>

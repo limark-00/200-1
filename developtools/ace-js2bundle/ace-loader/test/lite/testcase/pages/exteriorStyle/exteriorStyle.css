@@ -1,0 +1,100 @@
+/* exteriorStyle_Compiler_Test_001 */
+.a {
+  animation-delay: 300ms;
+  animation-iteration-count: 1000;
+  animation-duration: 900ms;
+  animation-fill-mode: none;
+}
+
+/* exteriorStyle_Compiler_Test_002 */
+.b {
+  animation-iteration-count: infinite;
+  background-image: url(/common/img/xmad.jpg);
+}
+
+/* exteriorStyle_Compiler_Test_003 */
+.c {
+  width: 200px;
+  color: #ffff23;
+}
+
+/* exteriorStyle_Compiler_Test_004 */
+.d {
+  color: firebrick;
+}
+
+/* exteriorStyle_Compiler_Test_005 */
+#e {
+  margin: 11px;
+}
+
+/* exteriorStyle_Compiler_Test_006 */
+@keyframes animationChange {
+  from {
+    background-color: #ff0000;
+  }
+  to {
+    background-color: #0000ff;
+  }
+}
+
+/* exteriorStyle_Compiler_Test_007 */
+@keyframes animationChange1 {
+  from {
+    transform: translateX(120px);
+  }
+  to {
+    transform: translateX(170px);
+  }
+}
+
+/* exteriorStyle_Compiler_Test_008 */
+@keyframes animationChange3 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* exteriorStyle_Compiler_Test_009 */
+.f {
+  margin: 10%;
+}
+
+/* exteriorStyle_Compiler_Test_010 */
+.g {
+  margin-left: -8%;
+  margin-right: 2%;
+  margin-top: 33%;
+  margin-bottom: 108%;
+}
+
+/* exteriorStyle_Compiler_Test_011 */
+.h {
+  top: 80%;
+  left: 20%;
+}
+
+/* exteriorStyle_Compiler_Test_012 */
+.i {
+  height: 30%;
+  width: 100%;
+}
+
+/* exteriorStyle_Compiler_Test_013 */
+@media screen and (max-width: 454px) {
+  .title {
+    font-size: 30px;
+    color: #f00;
+  }
+}
+
+/* exteriorStyle_Compiler_Test_014 */
+@media screen and (min-width: 455px) {
+  .title {
+    font-size: 72px;
+    color: #0f0;
+  }
+}

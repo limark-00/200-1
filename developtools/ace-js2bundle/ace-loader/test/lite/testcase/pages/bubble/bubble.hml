@@ -1,0 +1,33 @@
+<div class="container">
+  <!-- Bubble_Click_Test_001 -->
+  <div onclick="test1"></div>
+  <div @click="test2"></div>
+  <div on:click="test3"></div>
+  <div grab:click="test4"></div>
+
+  <div onclick.bubble="test5"></div>
+  <div @click.bubble="test6"></div>
+  <div on:click.bubble="test7"></div>
+  <div grab:click.bubble="test8"></div>
+
+  <div onclick.capture="test9"></div>
+  <div @click.capture="test10"></div>
+  <div on:click.capture="test11"></div>
+  <div grab:click.capture="test12"></div>
+
+  <!-- Bubble_Swipe_Longpress_Test_001 -->
+  <div onswipe="swipe1" grab:longpress.capture="longpress1"></div>
+  <div @swipe="swipe2" on:longpress.capture="longpress2"></div>
+  <div on:swipe="swipe3" @longpress.capture="longpress3"></div>
+  <div grab:swipe="swipe4" onlongpress.capture="longpress4"></div>
+
+  <div onswipe.bubble="swipe5" grab:longpress.bubble="longpress5"></div>
+  <div @swipe.bubble="swipe6" on:longpress.bubble="longpress6"></div>
+  <div on:swipe.bubble="swipe7"  @longpress.bubble="longpress7" ></div>
+  <div grab:swipe.bubble="swipe8" onlongpress.bubble="longpress8"></div>
+
+  <div onswipe.capture="swipe9" grab:longpress="longpress9"></div>
+  <div @swipe.capture="swipe10" on:longpress="longpress10"></div>
+  <div on:swipe.capture="swipe11" @longpress="longpress11"></div>
+  <div grab:swipe.capture="swipe12" onlongpress="longpress12"></div>
+</div>

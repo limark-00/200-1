@@ -1,0 +1,7 @@
+<div class="container">
+  <!-- show_test_1 -->
+  <text show="false"> Hello World </text>
+
+  <!-- show_test_2 -->
+  <text show="{{visible}}"> Hello World </text>
+</div>

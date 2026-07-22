@@ -1,0 +1,31 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {},
+    "classList": [
+      "container"
+    ],
+    "children": [
+      {
+        "type": "text",
+        "attr": {
+          "show": "false",
+          "value": "Hello World"
+        }
+      },
+      {
+        "type": "text",
+        "attr": {
+          "show": "{{visible}}",
+          "value": "Hello World"
+        }
+      }
+    ]
+  },
+  "styles": {},
+  "actions": {},
+  "data": {
+    "visible": false
+  },
+  "apiVersion": {}
+}

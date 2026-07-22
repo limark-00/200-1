@@ -1,0 +1,62 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {},
+    "classList": [
+      "container"
+    ],
+    "children": [
+      {
+        "type": "image",
+        "attr": {
+          "alt": "img",
+          "src": "{{src}}"
+        }
+      },
+      {
+        "type": "progress",
+        "attr": {
+          "type": "horizontal",
+          "percent": "{{percent}}",
+          "secondarypercent": "{{secondarypercent}}"
+        }
+      },
+      {
+        "type": "progress",
+        "attr": {
+          "type": "scale-ring",
+          "percent": "{{percent}}",
+          "secondarypercent": "{{secondarypercent}}",
+          "clockwise": "{{clockwise}}"
+        }
+      },
+      {
+        "type": "progress",
+        "attr": {
+          "type": "arc",
+          "percent": "{{percent}}"
+        }
+      },
+      {
+        "type": "chart",
+        "attr": {
+          "type": "line",
+          "options": "{{options}}",
+          "datasets": "{{datasets}}"
+        }
+      },
+      {
+        "type": "button",
+        "attr": {
+          "type": "capsule",
+          "value": "{{value}}",
+          "icon": "{{icon}}"
+        }
+      }
+    ]
+  },
+  "styles": {},
+  "apiVersion": {},
+  "actions": {},
+  "data": {}
+}

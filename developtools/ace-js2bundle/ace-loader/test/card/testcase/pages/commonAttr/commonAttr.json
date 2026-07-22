@@ -1,0 +1,17 @@
+{
+    "data": {
+      "testclass1": "testclass1",
+      "testclass2": "testclass2",
+      "col": "#008000",
+      "disabled": true
+    },
+    "apiVersion": {
+        "5": {
+          "disabled": false
+        },
+        "6": {
+          "col": "#808080",
+          "content": "Hello World!"
+        }
+    }
+}

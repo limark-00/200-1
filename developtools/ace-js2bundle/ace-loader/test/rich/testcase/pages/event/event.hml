@@ -1,0 +1,39 @@
+<div>
+  <!-- event_Compiler_Test_001 -->
+  <div onclick="test"></div>
+
+  <!-- event_Compiler_Test_002 -->
+  <div onclick="test(value)"></div>
+
+  <!-- event_Compiler_Test_003 -->
+  <div onclick="test(value, time)"></div>
+
+  <!-- event_Compiler_Test_004 -->
+  <div @click="test"></div>
+
+  <!-- event_Compiler_Test_005 -->
+  <div @click="test(value)"></div>
+
+  <!-- event_Compiler_Test_006 -->
+  <div @click="test(value, time)"></div>
+
+  <!-- event_Compiler_Test_007 -->
+  <input @click="handleInput('(')" />
+
+  <!-- event_Compiler_Test_008 -->
+  <input @click="handleInput(')')" />
+
+  <!-- event_Compiler_Test_009 -->
+  <input @click="handleInput('(', value, time)" />
+
+  <!-- bubble&capture_event_Tests -->
+  <div ontouchstart="test1"></div>
+  <div @touchstart="test2"></div>
+  <div on:touchstart="test3"></div>
+  <div grab:touchstart="test4"></div>
+  <div @touchstart.bubble="test5"></div>
+  <div on:touchstart.bubble="test6"></div>
+  <div grab:touchstart.bubble="test7"></div>
+  <div on:touchstart.capture="test8"></div>
+  <div grab:touchstart.capture="test9"></div>
+</div>

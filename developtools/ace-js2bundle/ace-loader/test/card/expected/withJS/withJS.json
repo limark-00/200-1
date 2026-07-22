@@ -1,0 +1,16 @@
+{
+    "template": {
+        "attr": {},
+        "classList": [
+            "container"
+        ],
+        "type": "div"
+    },
+    "styles": {},
+    "actions": {},
+    "data": {
+        "event": "$event.talk",
+        "name": "{{map.amy}}"
+    },
+    "apiVersion": {}
+}

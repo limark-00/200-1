@@ -1,0 +1,11 @@
+static_library("uart_led_cmd") {
+    sources = [
+        "uart_led_cmd.c",
+    ]
+
+    include_dirs = [
+        "//utils/native/lite/include",
+        "//kernel/liteos_m/components/cmsis/2.0",
+        "//base/iot_hardware/peripheral/interfaces/kits",
+    ]
+}

@@ -1,0 +1,4 @@
+<div class="back_container" onclick="back">
+  <image class="image_back" src="/common/image/back.png"></image>
+  <text class="text_back">返回</text>
+</div>

@@ -1,0 +1,67 @@
+<div>
+  <!-- expression_Compiler_Test_001 -->
+  <text>
+    {{ti || subTitle}}
+  </text>
+
+  <!-- expression_Compiler_Test_002 -->
+  <text>
+    {{ti && subTitle}}
+  </text>
+
+  <!-- expression_Compiler_Test_003 -->
+  <div>
+    {{isArrived === 'arrived' && isTravel === false}}
+  </div>
+
+  <!-- expression_Compiler_Test_004 -->
+  <div>
+    {{isArrived === 'arrived' || isTravel === false}}
+  </div>
+
+  <!-- expression_Compiler_Test_005 -->
+  <div>
+    {{!flag}}
+  </div>
+
+  <!-- expression_Compiler_Test_006 -->
+  <div>
+    {{!!flag}}
+  </div>
+
+  <!-- expression_Compiler_Test_007 -->
+  <div class="container">
+    <text class="text-text">{{1>2?3:4}}</text>
+    <text class="text-text">{{a}}</text>
+    <text class="text-text">{{1>2?a:b}}</text>
+    <text class="text-text">{{1>2?true:null}}</text>
+    <text class="{{this.a}}{{Math.PI}}"></text>
+    <text class="text-text">{{1>b?(v>4?a:6):7}}</text>
+    <text class="text-text">{{1>2?(3==4?"刘":"王"):7}}</text>
+    <text class="text-text">{{3<3?(3>3?'刘':'王'):7}}</text>
+    <text class="text-text">{{typeof 1}}</text>
+    <text class="text-text">{{new RegExp('123')}}</text>
+    <input value='{{"ABCDEFG".toLowerCase()}}'></input>
+    <input value="{{ns[1]}}"></input>
+    <input value="{{a.b.c.d}}"></input>
+    <input value="{{a.b.c[1]}}"></input>
+    <input value="{{(a.b.c)[1]}}"></input>
+    <text class="tab-text" for="{{tabsContent}}">{{$t('strings.home.tabsData')[$item].name}}</text>
+    <text if="{{showauto}}">a</text>
+      <text if="{{!showauto}}">b</text>
+    <button class="button_menu" value="go to demo ability" onclick="startAbility('com.example.showcases', 'ShowcasesAbility', {origin: 'showcases'})"></button>
+    <div class="item-content">
+      <picker class="picker" type="multi-text" range="{{range1.arr}}" value="{{curDate}}" selected="{{lastSelected}}" onchange="getDate"
+          oncancel="cancel" id="picker1"></picker>
+    </div>
+    <div class="content_for">
+          <text class="topic">测试show,if,for渲染属性</text>
+          <text class="text_large" for="{{list}}" tid="id">{{$idx}}+{{$item.id}}</text>
+          <text class="text_large" if="{{click}}" onclick="change_showon"> 点击显示的文本,点击此处显示show文本 </text>
+          <text class="text_large" elif="{{longpress}}" onlongpress="change_showoff"> 长按显示的文本，点击此处隐藏show文本 </text>
+          <text else> 默认显示的文本 </text>
+          <text class="text" show="{{showTest}}"> show显示的文本 </text>
+      </div>
+    <text class="remain_day_number">{{ $t('strings.remain_days', {year: currentYear, day: countDownDays}) }}</text>
+  </div>
+</div>

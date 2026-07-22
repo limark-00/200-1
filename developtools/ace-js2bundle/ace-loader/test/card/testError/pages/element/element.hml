@@ -1,0 +1,7 @@
+<element name='comp' src='../../common/component/comp'></element>
+<div class="container">
+  <div class="text-div">
+    <text class="title">element_test</text>
+  </div>
+  <comp @textClicked="textClicked"></comp>
+</div>

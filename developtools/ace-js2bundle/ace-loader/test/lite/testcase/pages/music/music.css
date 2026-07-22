@@ -1,0 +1,16 @@
+.wrapper {
+    height: 3000px;
+    width: 454px;
+    flex-direction: column;
+}
+.music-list-item {
+    width: 454px;
+    height: 300px;
+}
+.content {
+    height: 50px;
+    width: 454px;
+    text-align: center;
+    font-size: 30px;
+}
+

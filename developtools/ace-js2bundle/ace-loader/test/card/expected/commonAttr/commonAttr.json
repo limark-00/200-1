@@ -1,0 +1,134 @@
+{
+  "template": {
+    "attr": {},
+    "type": "div",
+    "classList": [
+      "container"
+    ],
+    "children": [
+      {
+        "attr": {
+          "value": "id_test1"
+        },
+        "type": "div",
+        "id": "testid"
+      },
+      {
+        "attr": {
+          "value": "style_test_1"
+        },
+        "type": "div",
+        "style": {
+          "color": "#008000"
+        }
+      },
+      {
+        "attr": {
+          "value": "style_test_2"
+        },
+        "type": "div",
+        "style": {
+          "borderTopColor": "{{col}}",
+          "borderRightColor": "{{col}}",
+          "borderBottomColor": "{{col}}",
+          "borderLeftColor": "{{col}}"
+        }
+      },
+      {
+        "attr": {
+          "value": "style_test_2"
+        },
+        "type": "div",
+        "style": {
+          "borderTopColor": "{{col}}",
+          "borderRightColor": "{{col}}",
+          "borderBottomColor": "{{col}}",
+          "borderLeftColor": "{{col}}",
+          "width": "50px"
+        }
+      },
+      {
+        "attr": {
+          "value": "class_test1"
+        },
+        "type": "div",
+        "classList": [
+          "title"
+        ]
+      },
+      {
+        "attr": {
+          "value": "class_test2"
+        },
+        "type": "div",
+        "classList": [
+          "title",
+          "table"
+        ]
+      },
+      {
+        "attr": {
+          "value": "class_test3"
+        },
+        "type": "div",
+        "classList": [
+          "title",
+          "table"
+        ]
+      },
+      {
+        "attr": {
+          "value": "class_test4"
+        },
+        "type": "div",
+        "classList": [
+          "{{testclass1}}"
+        ]
+      },
+      {
+        "attr": {
+          "value": "class_test5"
+        },
+        "type": "div",
+        "classList": [
+          "{{testclass1}}",
+          "{{testclass2}}"
+        ]
+      },
+      {
+        "attr": {
+          "value": "class_test6"
+        },
+        "type": "div",
+        "classList": [
+          "{{testclass1}}",
+          "{{testclass2}}"
+        ]
+      },
+      {
+        "attr": {
+          "disabled": "{{disabled}}",
+          "value": "disable_test1"
+        },
+        "type": "div"
+      }
+    ]
+  },
+  "styles": {},
+  "actions": {},
+  "data": {
+    "testclass1": "testclass1",
+    "testclass2": "testclass2",
+    "col": "#008000",
+    "disabled": true
+  },
+  "apiVersion": {
+    "5": {
+      "disabled": false
+    },
+    "6": {
+      "col": "#808080",
+      "content": "Hello World!"
+    }
+  }
+}

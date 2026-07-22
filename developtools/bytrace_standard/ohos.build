@@ -1,0 +1,28 @@
+{
+  "subsystem": "developtools",
+  "parts": {
+    "bytrace_standard": {
+      "module_list": [
+        "//developtools/bytrace_standard/interfaces/innerkits/native:bytrace_core",
+        "//developtools/bytrace_standard/bin:bytrace_target",
+        "//developtools/bytrace_standard/bin:bytrace.cfg",
+        "//developtools/bytrace_standard/interfaces/kits/js/napi:bytrace"
+      ],
+      "inner_kits": [
+        {
+          "type": "so",
+          "name": "//developtools/bytrace_standard/interfaces/innerkits/native:bytrace_core",
+          "header": {
+            "header_files": [
+              "bytrace.h"
+            ],
+            "header_base": "//developtools/bytrace_standard/interfaces/innerkits/native/include"
+          }
+        }
+      ],
+       "test_list": [
+        "//developtools/bytrace_standard/bin/test:moduletest"
+      ]
+    }
+  }
+}

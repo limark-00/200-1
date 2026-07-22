@@ -1,0 +1,7 @@
+<div>
+  <!-- inlineStyle_Compiler_Test_001 -->
+  <div class="container"></div>
+
+  <!-- inlineStyle_Compiler_Test_002 -->
+  <div class="container table"></div>
+</div>

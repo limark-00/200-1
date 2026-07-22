@@ -1,0 +1,40 @@
+<div class="container">
+  <!-- PERCENTAGE_LENGTH_VALIDATOR_test -->
+  <div style="width: 100%;">style_test1</div>
+
+  <!-- LENGTH_VALIDATOR_test -->
+  <div style="height: {{height}}">style_test2</div>
+
+  <!-- COLOR_VALIDATOR_test_1 -->
+  <div style="color: #008000;">style_test3</div>
+
+  <!-- COLOR_VALIDATOR_test_2 -->
+  <div style="color: #FF0000;">style_test4</div>
+
+  <!-- COLOR_VALIDATOR_test_3 -->
+  <div style="color: rgba(200, 180, 120, 1.0);">style_test5</div>
+
+  <!-- GRID_TEMPLATE_VALIDATOR_test -->
+  <div style="grid-template-columns: 50px 100px 60px;">style_test10</div>
+
+  <!-- NUMBER_VALIDATOR_test -->
+  <div style="grid-row-start: 2;">style_test11</div>
+
+  <!-- BORDER_VALIDATOR_test -->
+  <div style="border: 5px solid #FF0000;">style_test12</div>
+
+  <!-- TEXT_INDENT_VALIDATOR_test -->
+  <div style="text-indent: 50px;">style_test13</div>
+
+  <!-- URL_VALIDATOR_test_1 -->
+  <div style="background-image: url(/common/img/xmad.jpg);">style_test14</div>
+
+  <!-- ANGLE_VALIDATOR_test -->
+  <progress style="start-angle: 240deg;">style_test19</progress>
+
+  <!-- SHORTHAND_LENGTH_VALIDATOR_test -->
+  <div style="padding: 10px 15px;">style_test21</div>
+
+  <!-- URL_VALIDATOR_test_2 -->
+  <div style="background-image: url('https://huawei.com/logo.jpg');">style_test23</div>
+</div>

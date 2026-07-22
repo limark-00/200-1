@@ -1,0 +1,17 @@
+.container {
+  justify-content: center;
+  align-items: center;
+}
+
+.title {
+  font-size: 50px;
+}
+
+.text-div {
+  align-items: center;
+  justify-content: center;
+}
+
+.button {
+  font-size: 30px;
+}

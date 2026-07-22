@@ -1,0 +1,19 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {
+      "value": "importLess_test"
+    },
+    "classList": [
+      "container"
+    ]
+  },
+  "styles": {
+    ".container": {
+      "backgroundColor": "#000000"
+    }
+  },
+  "apiVersion": {},
+  "actions": {},
+  "data": {}
+}

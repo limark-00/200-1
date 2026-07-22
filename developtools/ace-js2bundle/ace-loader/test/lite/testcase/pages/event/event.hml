@@ -1,0 +1,31 @@
+<div>
+  <!-- event_Compiler_Test_001 -->
+  <div onclick="test"></div>
+
+  <!-- event_Compiler_Test_002 -->
+  <div onclick="test(value)"></div>
+
+  <!-- event_Compiler_Test_003 -->
+  <div onclick="test(value, time)"></div>
+
+  <!-- event_Compiler_Test_004 -->
+  <input @click="handleInput('(')" />
+
+  <!-- event_Compiler_Test_005 -->
+  <input @click="handleInput('（')" />
+
+  <!-- event_Compiler_Test_006 -->
+  <input @click="handleInput(')')" />
+
+  <!-- event_Compiler_Test_007 -->
+  <input @click="handleInput('）')" />
+
+  <!-- event_Compiler_Test_008 -->
+  <input @click="handleInput('kk', value, 'dd')" />
+
+  <!-- event_Compiler_Test_009 -->
+  <input @click="handleInput(value, time , '(')" />
+
+  <!-- event_Compiler_Test_010 -->
+  <input @click="handleInput('(', value, time)" />
+</div>

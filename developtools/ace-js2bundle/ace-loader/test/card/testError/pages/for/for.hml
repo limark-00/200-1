@@ -1,0 +1,15 @@
+<div class="container">
+  <div class="text-div">
+    <text class="title">for列表渲染.</text>
+  </div>
+
+  <div for="{{array}}" tid="id">
+      <text>{{$idx}}.{{$item.name}}</text>
+  </div>
+  <div for="{{value in array}}" tid="id">
+    <text>{{$idx}}.{{value.name}}</text>
+  </div>
+  <div for="{{(i, v) in array}}" tid="id">
+    <text>{{i}}{{v.name}}</text>
+  </div>
+</div>

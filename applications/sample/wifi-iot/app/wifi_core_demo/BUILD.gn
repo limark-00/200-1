@@ -1,0 +1,18 @@
+# Minimal STA-only smoke test for wifi_core (no MQTT).
+
+static_library("wifi_core_demo") {
+    sources = [
+        "wifi_core_demo.c",
+        #"wifi_connect.c",
+    ]
+
+    include_dirs = [
+        "//utils/native/lite/include",
+        "//kernel/liteos_m/components/cmsis/2.0",
+        "//applications/sample/wifi-iot/app/wifi_core",
+    ]
+
+    deps = [
+        "//applications/sample/wifi-iot/app/wifi_core:wifi_core",
+    ]
+}

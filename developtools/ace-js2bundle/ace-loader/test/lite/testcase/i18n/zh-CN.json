@@ -1,0 +1,15 @@
+{
+    "strings": {
+        "chest_tightness": "胸闷",
+        "dizziness": "头晕",
+        "choose_body_state": "选择测量身体状态"
+    },
+    "css": {
+        "measureHome_hand_top": "50px",
+        "judgeIos_height": "454px"
+    },
+    "value": {
+        "name": "日不落",
+        "singer": "蔡依林"
+    }
+}

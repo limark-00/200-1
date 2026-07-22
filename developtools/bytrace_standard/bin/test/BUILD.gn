@@ -1,0 +1,41 @@
+# Copyright (C) 2021 Huawei Device Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build/test.gni")
+import("//developtools/bytrace_standard/bytrace.gni")
+
+module_output_path = "bytrace_standard/bytrace"
+
+config("module_private_config") {
+  visibility = [ ":*" ]
+}
+
+ohos_moduletest("BytraceNDKTest") {
+  module_out_path = module_output_path
+  sources = [ "moduletest/common/native/bytrace_ndk_test.cpp" ]
+  deps = [
+    "${bytrace_path}/bin:bytrace_capture_inner",
+    "${innerkits_path}/native:bytrace_core",
+    "//third_party/googletest:gtest_main",
+  ]
+  external_deps = [
+    "hiviewdfx_hilog_native:libhilog",
+    "startup_l2:syspara",
+  ]
+  include_dirs = [ "${innerkits_path}/bytrace/bytrace_native/include" ]
+}
+
+group("moduletest") {
+  testonly = true
+  deps = [ ":BytraceNDKTest" ]
+}

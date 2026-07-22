@@ -1,0 +1,34 @@
+.container {
+    width: 454px;
+    height: 454px;
+}
+.head_t {
+    width: 454px;
+    height: 100px;
+    flex-direction: column;
+}
+.head_t_b {
+    width: 300px;
+    text-align: center;
+}
+.list {
+    width: 454px;
+    height: 112px;
+    justify-content: center;
+}
+.listL {
+    margin-top: 28px;
+    font-size: 38px;
+    text-align: center;
+}
+
+.buttonContainerStyle {
+    width: 454px;
+    height: 80px;
+}
+
+.buttonStyle {
+    width: 200px;
+    height: 60px;
+    margin-left: 130px;
+}

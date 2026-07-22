@@ -1,0 +1,6 @@
+<div>
+  <!-- event_test_1 -->
+  <div onclick="router"></div>
+  <!-- event_test_2 -->
+  <div @click="router"></div>
+</div>

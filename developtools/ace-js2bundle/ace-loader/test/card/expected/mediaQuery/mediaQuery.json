@@ -1,0 +1,50 @@
+{
+  "template": {
+    "type": "div",
+    "attr": {
+      "value": "mediaQuery_test"
+    }
+  },
+  "styles": {
+    "@MEDIA": [
+      {
+        "condition": "(dark-mode:true)",
+        ".header": {
+          "width": "100%",
+          "height": "60px",
+          "fontSize": "16px",
+          "alignItems": "center",
+          "justifyContent": "center"
+        },
+        ".footer": {
+          "width": "100%",
+          "height": "40px",
+          "alignItems": "center"
+        }
+      },
+      {
+        "condition": "(dark-mode:true)",
+        ".title": {
+          "fontSize": "16px",
+          "color": "#333333",
+          "alignItems": "center"
+        },
+        ".container": {
+          "width": "500px",
+          "height": "500px",
+          "backgroundColor": "#fa8072"
+        },
+        ".button": {
+          "paddingTop": "50px",
+          "fontSize": "16px",
+          "color": "#666666",
+          "alignItems": "center",
+          "justifyContent": "center"
+        }
+      }
+    ]
+  },
+  "actions": {},
+  "data": {},
+  "apiVersion": {}
+}

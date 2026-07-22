@@ -1,0 +1,60 @@
+{
+    "name": "@ohos/developtools_bytrace_standard",
+    "version": "",
+    "description": "提供用户空间性能打点机制，并控制用户空间跟踪和设置内核ftrace的捕获事件",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "Apache V2",
+    "repository": "https://gitee.com/openharmony/developtools_bytrace_standard",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "developtools"
+    ],
+    "keywords": [
+        "developtools",
+        "bytrace",
+        "standard"
+    ],
+    "envs": [],
+    "dirs": [],
+    "author": {
+        "name": "",
+        "email": "",
+        "url": ""
+    },
+    "contributors": [
+        {
+            "name": "",
+            "email": "",
+            "url": ""
+        }
+    ],
+    "segment": {
+        "destPath": "developtools/bytrace_standard"
+    },
+    "component": {
+        "name": "bytrace",
+        "subsystem": "bytrace",
+        "syscap": [
+            "SystemCapability.Developtools.Bytrace"
+        ],
+        "features": [],
+        "adapted_system_type": [
+            "standard"
+        ],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}
