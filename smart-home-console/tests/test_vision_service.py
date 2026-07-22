@@ -903,6 +903,49 @@ class VisionServiceTests(unittest.TestCase):
         )
         self.assertNotIn("/private/secret", str(service.get_status()))
 
+    def test_storage_recovery_restores_zone_and_closes_startup_rows(self):
+        class RecoveringRepository(EventRepository):
+            fail_initialize = False
+
+            def initialize(self):
+                if self.fail_initialize:
+                    raise OSError("database temporarily unavailable")
+                return super().initialize()
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        repository = RecoveringRepository(
+            os.path.join(temporary.name, "events.db")
+        )
+        persisted_zone = NormalizedZone(0.2, 0.2, 0.4, 0.4)
+        repository.initialize()
+        repository.save_zone(persisted_zone)
+        stale_event_id = repository.create_event("stale.jpg", 1)
+        repository.fail_initialize = True
+        detector = ZoneDetector(2.0, 3.0, clock=FakeClock())
+        alarm = RecordingAlarm()
+        service = self.make_service(
+            zone_detector=detector,
+            event_repository=repository,
+            alarm_controller=alarm,
+            event_snapshot_dir=temporary.name,
+            overlay_renderer=lambda frame, _zone, _state: frame,
+        )
+
+        service.initialize_safety()
+        self.assertEqual(detector.get_status()["state"], "disabled")
+
+        repository.fail_initialize = False
+        service.process_frame(SafetyModel(rows=[]), FakeFrame())
+
+        self.assertEqual(detector.get_status()["zone"], persisted_zone)
+        self.assertEqual(detector.get_status()["state"], "armed")
+        self.assertEqual(
+            repository.get_event(stale_event_id)["close_reason"],
+            "server_restart",
+        )
+        self.assertEqual(service.get_status()["storage_error"], "")
+
     def test_acknowledgment_rejects_open_row_that_is_not_detector_event(self):
         service, _detector, repository, _alarm, _clock, _directory = (
             self.active_safety_service()

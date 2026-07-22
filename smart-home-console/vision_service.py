@@ -190,6 +190,7 @@ class VisionService:
         self._exit_elapsed = 0.0
         self._safety_clock = getattr(zone_detector, "_clock", time.monotonic)
         self._storage_initialized = False
+        self._startup_recovery_pending = False
         self._storage_error = ""
         self._pending_closures: dict[int, str] = {}
         self._pending_delivery_audits: dict[
@@ -547,8 +548,10 @@ class VisionService:
                     self._event_repository.recover_open_events("server_restart")
                 except Exception as exc:
                     self._storage_initialized = False
+                    self._startup_recovery_pending = True
                     self._record_storage_failure_locked(exc)
                 else:
+                    self._startup_recovery_pending = False
                     if self._zone_detector is not None and zone is not None:
                         self._zone_detector.set_zone(zone)
                     self._clear_storage_error_if_reconciled_locked()
@@ -842,11 +845,23 @@ class VisionService:
         if not self._storage_initialized or self._storage_error:
             try:
                 self._event_repository.initialize()
+                if self._startup_recovery_pending:
+                    zone = self._event_repository.get_zone()
+                    self._event_repository.recover_open_events(
+                        "server_restart"
+                    )
             except Exception as exc:
                 self._storage_initialized = False
                 self._record_storage_failure_locked(exc)
                 raise
             self._storage_initialized = True
+            if self._startup_recovery_pending:
+                if self._zone_detector is not None:
+                    self._zone_detector.clear_zone()
+                    self._reset_safety_observation()
+                    if zone is not None:
+                        self._zone_detector.set_zone(zone)
+                self._startup_recovery_pending = False
         self._reconcile_pending_storage_locked()
         self._clear_storage_error_if_reconciled_locked()
 
@@ -889,6 +904,7 @@ class VisionService:
     def _clear_storage_error_if_reconciled_locked(self) -> None:
         if (
             self._storage_initialized
+            and not self._startup_recovery_pending
             and not self._pending_closures
             and not self._pending_delivery_audits
         ):
