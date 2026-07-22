@@ -361,24 +361,37 @@ sudo journalctl -u smart-home -f    # 实时日志
 
 ## 🧪 测试
 
-### 1. 无摄像头：先验证其他界面
+### 1. 本地离线回归验证
+
+在 `smart-home-console` 目录执行：
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m compileall -q app.py config.py bemfa_api.py camera.py vision_service.py zone_detector.py event_repository.py vision_alarm.py tests
+```
+
+预期：单元测试零失败、零错误，`compileall` 零编译错误。这两条命令不需要连接真实摄像头、Hi3861 或巴法云。
+
+### 2. 无摄像头：先验证其他界面
 
 1. 使用 `VISION_ENABLED=0 python app.py` 关闭视觉线程
 2. 打开首页，确认环境数据和报警控制仍正常
 3. 访问 `/api/vision/status`，应看到 `"enabled": false`
 
-### 2. Ubuntu 真实摄像头联调
+### 3. Ubuntu 真实摄像头联调
 
 1. 启动后访问 `http://127.0.0.1:5001/api/vision/status`
 2. 确认 `model_loaded` 和 `camera_online` 都为 `true`
 3. 打开首页，人走入画面后确认检测框、人数和 FPS 变化
 4. 若改变了摄像头索引，重启后端再测试
 
-### 3. 用 `/docs` 交互测试 API
+### 4. 用 `/docs` 交互测试 API
 
 打开 http://127.0.0.1:5001/docs → 展开接口 → Try it out → Execute
 
-### 4. 独立测试巴法云连接
+### 5. 巴法云连接测试（与本地回归分开）
+
+`test_bemfa.py` 不在上述离线回归命令中；它可能根据当前配置访问真实巴法云，只在已确认 UID、Topic 和网络环境时单独执行：
 
 ```bash
 python test_bemfa.py

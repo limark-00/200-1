@@ -163,21 +163,19 @@ WiFi: Connected, starting DHCP
 [day08][uart] {"temperature":25.36,"humidity":58.42,...}
 ```
 
-在巴法云依次下发 `vision_alarm_on` 和 `vision_alarm_off`，串口必须分别出现：
+在巴法云依次下发 `vision_alarm_on` 和 `vision_alarm_off`。必须以「命令已应用」日志和后续上行 `vision_alarm` 字段作为两组强制验收证据：
 
 ```text
-[day08][sub] topic=你的主题 qos=0 payload=vision_alarm_on
-[day08][alarm] buzzer=ON
 [day08][alarm] command applied: vision_alarm_on
 [day08][mqtt] ... "vision_alarm":1 ...
 
-[day08][sub] topic=你的主题 qos=0 payload=vision_alarm_off
-[day08][alarm] buzzer=OFF
 [day08][alarm] command applied: vision_alarm_off
 [day08][mqtt] ... "vision_alarm":0 ...
 ```
 
-若手动或湿度源仍为真，收到 `vision_alarm_off` 后不应出现 `buzzer=OFF`；此时上行数据中应同时看到 `"vision_alarm":0` 和 `"buzzer":1`。
+`[day08][alarm] buzzer=ON` 或 `buzzer=OFF` 只在多源合并后的物理输出确实发生变化时出现，不是每条视觉命令的必备日志。如果其他报警源已将蜂鸣器保持在相同状态，对应的 `buzzer=ON` 或 `buzzer=OFF` 行可能不出现。
+
+若手动或湿度源仍为真，收到 `vision_alarm_off` 后不应出现 `buzzer=OFF`；此时上行数据中应同时看到 `"vision_alarm":0` 和 `"buzzer":1`，以证明视觉源已清除且湿度源仍独立保持蜂鸣器开启。
 
 ## 八、Ubuntu/OpenHarmony 编译和主机可移植测试
 
