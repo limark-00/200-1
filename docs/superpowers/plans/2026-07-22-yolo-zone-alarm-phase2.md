@@ -35,7 +35,7 @@
 - Consumes: normalized person foot points as `Sequence[tuple[float, float]]`, an optional `NormalizedZone`, and an injected monotonic clock.
 - Produces: `NormalizedZone`, `ZoneState`, `ZoneUpdate`, and `ZoneDetector` with `set_zone()`, `clear_zone()`, `update()`, `bind_event()`, `acknowledge()`, and `get_status()`.
 
-- [ ] **Step 1: Write failing state-machine tests**
+- [x] **Step 1: Write failing state-machine tests**
 
 Create tests with an explicitly controlled clock:
 
@@ -122,7 +122,7 @@ def test_acknowledged_event_stays_silent_until_exit():
 
 Also cover zone boundary inclusion, invalid normalized rectangles, entry-timer reset, maximum people, deleting an active zone, and acknowledgment with the wrong event ID.
 
-- [ ] **Step 2: Run tests and verify the intended failure**
+- [x] **Step 2: Run tests and verify the intended failure**
 
 Run:
 
@@ -132,7 +132,7 @@ Run:
 
 Expected: import failure because `zone_detector.py` does not exist.
 
-- [ ] **Step 3: Implement the state machine**
+- [x] **Step 3: Implement the state machine**
 
 Use these exact public types and state names:
 
@@ -181,7 +181,7 @@ class ZoneUpdate:
 
 Implement `ZoneDetector` with an `RLock`. Store `_enter_started_at`, `_exit_started_at`, `_max_people`, and `_active_event_id`. Reset the entry timer whenever occupancy becomes zero before 2 seconds. In active or silenced state, reset the exit timer whenever occupancy becomes nonzero before 3 seconds. `clear_zone()` returns the former active event ID so callers can close it safely.
 
-- [ ] **Step 4: Run focused and full tests**
+- [x] **Step 4: Run focused and full tests**
 
 Run:
 
@@ -192,7 +192,7 @@ Run:
 
 Expected: all zone tests and all existing phase-1 tests pass.
 
-- [ ] **Step 5: Commit the state machine**
+- [x] **Step 5: Commit the state machine**
 
 ```bash
 git add smart-home-console/zone_detector.py smart-home-console/tests/test_zone_detector.py
@@ -213,7 +213,7 @@ git commit -m "feat: add danger-zone state machine"
 - Consumes: `NormalizedZone`, event timestamps, snapshot filenames, people counts, close reasons, and delivery results.
 - Produces: `EventRepository.initialize()`, `get_zone()`, `save_zone()`, `delete_zone()`, `create_event()`, `get_event()`, `update_max_people()`, `acknowledge_event()`, `close_event()`, `mark_delivery()`, `recover_open_events()`, and `list_events()`.
 
-- [ ] **Step 1: Write failing repository tests against a temporary database**
+- [x] **Step 1: Write failing repository tests against a temporary database**
 
 Test exact persistence semantics:
 
@@ -255,7 +255,7 @@ def test_recovery_closes_only_open_events(self):
 
 Also test list ordering, default/maximum limits, missing-event errors, closed-event acknowledgment conflict, idempotent acknowledgment, and delivery failure text.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -265,7 +265,7 @@ Run:
 
 Expected: import failure because `event_repository.py` does not exist.
 
-- [ ] **Step 3: Implement schema and connection policy**
+- [x] **Step 3: Implement schema and connection policy**
 
 Add configuration:
 
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS vision_events (
 
 Use timezone-aware UTC ISO-8601 strings for all timestamps. Implement `save_zone()` as an `INSERT ... ON CONFLICT(id) DO UPDATE`, always with `id = 1`, and make `list_events(limit=50)` enforce `1 <= limit <= 200` and order by `id DESC`. Define `EventNotFoundError` and `EventClosedError`. Convert rows to plain dictionaries before closing connections. `snapshot_filename` remains an empty string when evidence writing fails. `mark_delivery()` updates only the on/off delivery column selected by the command and stores the final error text.
 
-- [ ] **Step 4: Ignore runtime files and verify repository tests**
+- [x] **Step 4: Ignore runtime files and verify repository tests**
 
 Add:
 
@@ -344,7 +344,7 @@ Create `smart-home-console/static/vision_events/.gitkeep`, then run:
 
 Expected: repository and existing tests pass; no DB appears in `git status --short`.
 
-- [ ] **Step 5: Commit persistence support**
+- [x] **Step 5: Commit persistence support**
 
 ```bash
 git add smart-home-console/event_repository.py smart-home-console/tests/test_event_repository.py smart-home-console/config.py smart-home-console/.gitignore smart-home-console/static/vision_events/.gitkeep
@@ -363,7 +363,7 @@ git commit -m "feat: persist vision zones and events"
 - Consumes: a sender `Callable[[str], dict]`, a delivery callback `Callable[[int | None, str, bool, str], None]`, and alarm targets.
 - Produces: `AlarmTask`, `VisionAlarmController.start()`, `set_alarm()`, `wait_idle()`, `stop()`, and `get_last_error()`.
 
-- [ ] **Step 1: Write failing tests for ordering, dedupe, and retries**
+- [x] **Step 1: Write failing tests for ordering, dedupe, and retries**
 
 Use injected sender and sleeper functions:
 
@@ -415,7 +415,7 @@ def test_forced_off_bypasses_initial_dedupe():
 
 Also verify on/off ordering, callback arguments, stop behavior, and last-error clearing after a later success.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_alarm -v
@@ -423,7 +423,7 @@ Also verify on/off ordering, callback arguments, stop behavior, and last-error c
 
 Expected: import failure because `vision_alarm.py` does not exist.
 
-- [ ] **Step 3: Implement the queue worker**
+- [x] **Step 3: Implement the queue worker**
 
 Use this task contract:
 
@@ -449,7 +449,7 @@ class VisionAlarmController:
 
 The worker converts `enabled` into `vision_alarm_on` or `vision_alarm_off`. Call the sender as `sender(command)`, never directly from `set_alarm()`. Call `queue.task_done()` in `finally`. Implement `wait_idle(timeout)` with a condition/event rather than an unbounded sleep.
 
-- [ ] **Step 4: Run focused and full tests**
+- [x] **Step 4: Run focused and full tests**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_alarm -v
@@ -458,7 +458,7 @@ The worker converts `enabled` into `vision_alarm_on` or `vision_alarm_off`. Call
 
 Expected: all tests pass without real Bemfa requests.
 
-- [ ] **Step 5: Commit the alarm controller**
+- [x] **Step 5: Commit the alarm controller**
 
 ```bash
 git add smart-home-console/vision_alarm.py smart-home-console/tests/test_vision_alarm.py
@@ -482,7 +482,7 @@ git commit -m "feat: queue vision alarm commands"
 - Consumes: humidity samples and MQTT payloads `alarm_on`, `alarm_off`, `vision_alarm_on`, and `vision_alarm_off`.
 - Produces: portable `Day08AlarmState`, `Day08Alarm_UpdateHumidity()`, `Day08Alarm_ApplyCommand()`, `Day08Alarm_ShouldBuzz()`, and upstream JSON field `vision_alarm`.
 
-- [ ] **Step 1: Write a host-runnable C regression test**
+- [x] **Step 1: Write a host-runnable C regression test**
 
 Use these assertions:
 
@@ -509,7 +509,7 @@ int main(void)
 }
 ```
 
-- [ ] **Step 2: Compile the test and verify failure**
+- [x] **Step 2: Compile the test and verify failure**
 
 Run:
 
@@ -519,7 +519,7 @@ cc -std=c99 -Wall -Wextra -Werror -I applications/sample/wifi-iot/app/day08_mqtt
 
 Expected: compiler failure because `day08_alarm.c` and `day08_alarm.h` do not exist.
 
-- [ ] **Step 3: Implement the portable alarm state**
+- [x] **Step 3: Implement the portable alarm state**
 
 Define:
 
@@ -542,7 +542,7 @@ return state->manual_alarm_on ||
 
 `alarm_on` sets `manual_alarm_on` and clears `humidity_silenced`, without changing `vision_alarm_on`. `alarm_off` clears only `manual_alarm_on` and sets `humidity_silenced`; it never changes `vision_alarm_on`. `vision_alarm_off` clears only `vision_alarm_on`. A humidity value at or below 45 clears `humidity_silenced` and re-arms the next humidity excursion.
 
-- [ ] **Step 4: Integrate the state module into MQTT and telemetry**
+- [x] **Step 4: Integrate the state module into MQTT and telemetry**
 
 Add `day08_alarm.c` to `sources`. Replace the three separate alarm globals with one `Day08AlarmState`. After humidity samples or recognized commands, call:
 
@@ -558,7 +558,7 @@ Add telemetry field:
 
 and pass `g_alarm_state.vision_alarm_on` to `snprintf`. Extend `parse_env_message()` with `vision_alarm`, preserving all existing fields.
 
-- [ ] **Step 5: Run portable C and Python parser tests**
+- [x] **Step 5: Run portable C and Python parser tests**
 
 ```bash
 /tmp/day08_alarm_test
@@ -568,7 +568,7 @@ and pass `g_alarm_state.vision_alarm_on` to `snprintf`. Extend `parse_env_messag
 
 Expected: C test exits 0; parser returns `vision_alarm` as `0` or `1`; all Python tests pass.
 
-- [ ] **Step 6: Commit embedded alarm separation**
+- [x] **Step 6: Commit embedded alarm separation**
 
 ```bash
 git add applications/sample/wifi-iot/app/day08_mqtt_new/day08_alarm.h applications/sample/wifi-iot/app/day08_mqtt_new/day08_alarm.c applications/sample/wifi-iot/app/day08_mqtt_new/tests/test_day08_alarm.c applications/sample/wifi-iot/app/day08_mqtt_new/BUILD.gn applications/sample/wifi-iot/app/day08_mqtt_new/mqtt.c smart-home-console/bemfa_api.py smart-home-console/tests/test_bemfa_vision_alarm.py
@@ -587,7 +587,7 @@ git commit -m "feat: separate Hi3861 vision alarm state"
 - Consumes: `ZoneDetector`, `EventRepository`, `VisionAlarmController`, YOLO `boxes.xyxy`, and a snapshot directory.
 - Produces: foot-point extraction, server-side zone overlay, evidence-event lifecycle, extended status, `save_zone()`, `delete_zone()`, `list_events()`, `acknowledge_event()`, `initialize_safety()`, and `shutdown_safety()`.
 
-- [ ] **Step 1: Write failing integration tests with injected fakes**
+- [x] **Step 1: Write failing integration tests with injected fakes**
 
 Extend the existing test fakes with a frame shape, pixel coordinates, a real temporary repository, and a recording alarm controller:
 
@@ -691,7 +691,7 @@ Update `make_service()` to pass through each of the five new optional constructo
 
 Also test bottom-center normalization, no zone, outside-zone persons, three-second clearing, maximum people updates, screenshot failure, camera disconnect not advancing timers, and active-zone deletion.
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_service -v
@@ -699,7 +699,7 @@ Also test bottom-center normalization, no zone, outside-zone persons, three-seco
 
 Expected: failures because phase-1 `VisionService` has no safety dependencies or extended status.
 
-- [ ] **Step 3: Extend constructor and helpers**
+- [x] **Step 3: Extend constructor and helpers**
 
 Add optional constructor arguments so existing phase-1 tests remain valid:
 
@@ -713,7 +713,7 @@ overlay_renderer: Callable[[Any, NormalizedZone | None, ZoneState], Any] | None 
 
 Implement `extract_foot_points(boxes, frame_width, frame_height)` by converting `boxes.xyxy.cpu().tolist()`. Each point is `((x1 + x2) / 2 / width, y2 / height)`, clamped to `[0, 1]`.
 
-- [ ] **Step 4: Coordinate state transitions without network I/O**
+- [x] **Step 4: Coordinate state transitions without network I/O**
 
 During `process_frame()`:
 
@@ -729,11 +729,11 @@ During `process_frame()`:
 
 If snapshot writing fails, create the event with an empty filename and store the filesystem message in `last_error`; still enqueue alarm-on. If event creation fails, do not bind a fake ID, but still enqueue alarm-on with `event_id=None`. `delete_zone()` must persist deletion before mutating the detector; if an event was active, close it as `zone_deleted` and enqueue alarm-off. `save_zone()` follows the same persist-first rule so an SQLite failure leaves the in-memory zone unchanged.
 
-- [ ] **Step 5: Implement lifecycle recovery and shutdown**
+- [x] **Step 5: Implement lifecycle recovery and shutdown**
 
 `initialize_safety()` initializes SQLite, loads the zone, closes stale events as `server_restart`, starts the alarm worker, and calls `set_alarm(False, force=True)`. `shutdown_safety()` stops frame processing, closes any active event as `server_shutdown`, forces alarm-off, waits at most 3 seconds, and stops the alarm worker.
 
-- [ ] **Step 6: Run focused and full tests**
+- [x] **Step 6: Run focused and full tests**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_service -v
@@ -742,7 +742,7 @@ If snapshot writing fails, create the event with an empty filename and store the
 
 Expected: integration tests and all phase-1 tests pass.
 
-- [ ] **Step 7: Commit vision integration**
+- [x] **Step 7: Commit vision integration**
 
 ```bash
 git add smart-home-console/vision_service.py smart-home-console/tests/test_vision_service.py
@@ -761,7 +761,7 @@ git commit -m "feat: detect and record zone intrusions"
 - Consumes: the extended singleton `VisionService` API.
 - Produces: zone CRUD, event listing/acknowledgment, and corrected startup/shutdown ordering.
 
-- [ ] **Step 1: Write failing API tests**
+- [x] **Step 1: Write failing API tests**
 
 Add a fake service that stores a zone and events, then test:
 
@@ -790,7 +790,7 @@ def test_acknowledging_closed_event_returns_409(self):
 
 Also test GET/DELETE zone, default event ordering, limit 201 rejection, missing-event 404, and idempotent active acknowledgment.
 
-- [ ] **Step 2: Run API tests and verify route failures**
+- [x] **Step 2: Run API tests and verify route failures**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_api -v
@@ -798,7 +798,7 @@ Also test GET/DELETE zone, default event ordering, limit 201 rejection, missing-
 
 Expected: new requests return 404 before route implementation.
 
-- [ ] **Step 3: Add validated request models and routes**
+- [x] **Step 3: Add validated request models and routes**
 
 Define `VisionZoneBody` with bounded floats and a model-level `x + width` / `y + height` check. Add:
 
@@ -814,7 +814,7 @@ Map `EventNotFoundError` to 404, `EventClosedError` to 409, persistence errors t
 
 For event responses, add a derived `snapshot_url`: use `/static/vision_events/{URL-encoded filename}` when `snapshot_filename` is nonempty and `null` otherwise. The route must never expose the absolute evidence-directory path. Validate `limit` with FastAPI bounds `ge=1, le=200` so invalid values return 422.
 
-- [ ] **Step 4: Update singleton construction and lifespan**
+- [x] **Step 4: Update singleton construction and lifespan**
 
 Create repository, detector, and alarm controller from `config.py`. The controller sender is:
 
@@ -826,7 +826,7 @@ Pass `repository.mark_delivery` as the controller's delivery callback so the fin
 
 Lifespan startup calls `vision_service.initialize_safety()` before `vision_service.start()`. Shutdown calls `vision_service.stop()` before `vision_service.shutdown_safety()`.
 
-- [ ] **Step 5: Run API and full tests**
+- [x] **Step 5: Run API and full tests**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_api -v
@@ -835,7 +835,7 @@ Lifespan startup calls `vision_service.initialize_safety()` before `vision_servi
 
 Expected: all API status codes and existing interfaces pass.
 
-- [ ] **Step 6: Commit the API**
+- [x] **Step 6: Commit the API**
 
 ```bash
 git add smart-home-console/app.py smart-home-console/tests/test_vision_api.py
@@ -854,7 +854,7 @@ git commit -m "feat: expose zone intrusion APIs"
 - Consumes: `/api/vision/zone`, `/api/vision/events`, `/api/vision/events/{id}/ack`, extended status, and static evidence image URLs.
 - Produces: rectangle editor, zone-state display, active-event silence control, and event history.
 
-- [ ] **Step 1: Extend the failing HTML contract test**
+- [x] **Step 1: Extend the failing HTML contract test**
 
 Assert the template includes:
 
@@ -879,7 +879,7 @@ self.assertIn("function imageContentRect()", self.html)
 self.assertIn("function normalizedZoneFromDrag", self.html)
 ```
 
-- [ ] **Step 2: Run template tests and verify failure**
+- [x] **Step 2: Run template tests and verify failure**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_template -v
@@ -887,13 +887,13 @@ self.assertIn("function normalizedZoneFromDrag", self.html)
 
 Expected: missing element IDs and JavaScript functions.
 
-- [ ] **Step 3: Add the overlay and editor controls**
+- [x] **Step 3: Add the overlay and editor controls**
 
 Place `<canvas id="visionZoneCanvas">` absolutely over `#visionStream`. In normal mode set `pointer-events: none`; in editing mode enable pointer events and crosshair cursor. Add edit/save/cancel/delete buttons and disable save until the drag rectangle satisfies the 0.02 minimum dimensions.
 
 Implement `imageContentRect()` from the `<img>` element's client size and `naturalWidth/naturalHeight`, accounting for `object-fit: contain`. Convert pointer positions through that rectangle before normalizing. Do not include letterbox pixels.
 
-- [ ] **Step 4: Add status and event rendering**
+- [x] **Step 4: Add status and event rendering**
 
 Map server states to Chinese labels and colors:
 
@@ -923,7 +923,7 @@ function escapeHtml(value) {
 }
 ```
 
-- [ ] **Step 5: Run template and full tests**
+- [x] **Step 5: Run template and full tests**
 
 ```bash
 .venv/bin/python -m unittest tests.test_vision_template -v
@@ -932,7 +932,7 @@ function escapeHtml(value) {
 
 Expected: contract tests and all backend tests pass.
 
-- [ ] **Step 6: Commit the browser interface**
+- [x] **Step 6: Commit the browser interface**
 
 ```bash
 git add smart-home-console/templates/index.html smart-home-console/tests/test_vision_template.py
@@ -952,7 +952,7 @@ git commit -m "feat: add browser danger-zone editor"
 - Consumes: the completed Python, browser, and Hi3861 behavior.
 - Produces: reproducible deployment, firmware, test, and acceptance instructions.
 
-- [ ] **Step 1: Document exact run and firmware steps**
+- [x] **Step 1: Document exact run and firmware steps**
 
 Add:
 
@@ -965,7 +965,7 @@ Add:
 - serial-output checks for both vision commands and `vision_alarm` telemetry;
 - backup/removal instructions for the runtime DB and evidence directory without committing either.
 
-- [ ] **Step 2: Run fresh full Python verification**
+- [x] **Step 2: Run fresh full Python verification**
 
 ```bash
 cd smart-home-console
@@ -975,7 +975,7 @@ cd smart-home-console
 
 Expected: zero failures and zero compilation errors.
 
-- [ ] **Step 3: Run portable C verification**
+- [x] **Step 3: Run portable C verification**
 
 ```bash
 cd ..
@@ -993,6 +993,8 @@ python build.py wifiiot
 
 Expected: `Hi3861_wifiiot_app.out` links successfully and build logs include `day08_alarm.c` and `day08_mqtt_new`.
 
+> Deferred: requires the project configured Ubuntu OpenHarmony/Hi3861 toolchain; it is not available in this Mac worktree.
+
 - [ ] **Step 5: Perform real hardware acceptance**
 
 Verify in order:
@@ -1008,7 +1010,9 @@ Verify in order:
 9. Disconnect/reconnect the camera and confirm no false `person_left` event is generated during missing frames.
 10. Restart `app.py` during an active event and confirm stale state closes with `server_restart` and hardware receives forced vision-off.
 
-- [ ] **Step 6: Inspect scope and runtime artifacts**
+> Deferred: requires the project Ubuntu machine, connected Hi3861/Bemfa hardware path, and a live camera browser acceptance setup.
+
+- [x] **Step 6: Inspect scope and runtime artifacts**
 
 ```bash
 git diff --check
@@ -1018,7 +1022,7 @@ git diff --stat codex/yolo-vision-phase1...HEAD
 
 Expected: no model weights, database files, evidence images, credentials, or unrelated edits appear.
 
-- [ ] **Step 7: Mark this plan complete and commit documentation**
+- [x] **Step 7: Mark this plan complete and commit documentation**
 
 Change all completed checkboxes in this plan to `[x]`, then run:
 

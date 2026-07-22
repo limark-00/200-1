@@ -24,13 +24,21 @@
 - 🎥 **YOLO 安全监控** — 罗技 USB 摄像头实时画面、person 检测框和人数统计
 - 🔄 **双模式** — 模拟模式（无硬件可跑）与真实巴法云模式一键切换
 
-### 视觉子系统第一阶段
+### 视觉子系统第二阶段
 
-本阶段仅实现「实时监控 + YOLO 人员识别」：后台只打开一次摄像头和模型，所有网页客户端共享同一路已标注 MJPEG 画面。限制区域、滞留报警、事件记录、NFC 授权和人脸识别属于后续阶段。
+后台只打开一次摄像头和 YOLO 模型，所有网页客户端共享同一路 MJPEG。系统支持一个归一化矩形危险区域，以 person 检测框的底边中点判断是否进入。连续占用 2 秒创建一条事件和一张证据图；事件期间不重复创建，连续空置 3 秒后关闭并重新布防。
 
 ```text
-罗技USB摄像头 → OpenCV采集 → YOLO(person) → FastAPI MJPEG → 网页监控面板
+罗技 USB 摄像头 → OpenCV 采集 → YOLO(person 底边中点)
+                                  ├→ FastAPI MJPEG → 浏览器 Canvas 区域/状态/事件
+                                  └→ ZoneDetector
+                                      ├→ SQLite 事件 + JPEG 证据
+                                      └→ 队列异步下发 Bemfa
+                                          → vision_alarm_on/off
+                                          → Hi3861 多源蜂鸣器
 ```
+
+区域保存在 `data/vision_events.db` 的 `vision_zone` 表，事件保存在同库的 `vision_events` 表，证据图保存在 `static/vision_events/`。这些都是运行时数据，已由 `.gitignore` 排除。当摄像头无帧或断线时状态计时器不会用空检测结果推进，避免误生成 `person_left`。
 
 ```
 ┌──────────┐     HTTP      ┌──────────────┐     HTTP API     ┌──────────┐
@@ -127,7 +135,10 @@ smart-home-console/
 ├── config.py              # 全局配置：UID、Topic、端口、模式开关
 ├── bemfa_api.py           # 巴法云 HTTP 封装：getmsg / send / Mock
 ├── camera.py              # 摄像头抓拍：OpenCV 拍照 + 占位图降级 + 图像识别预留
-├── vision_service.py       # 单例摄像头 + YOLO人员检测 + MJPEG画面
+├── vision_service.py       # 单例摄像头、YOLO、MJPEG 和区域事件协调
+├── zone_detector.py        # 纯危险区域状态机
+├── event_repository.py     # SQLite 区域和事件存储
+├── vision_alarm.py         # 队列式巴法云视觉报警下发
 ├── requirements.txt       # Python 依赖清单
 ├── README.md              # 本文件
 ├── 实训技术文档.md          # 完整教学文档（原理 / 修改指南 / API 测试）
@@ -137,7 +148,8 @@ smart-home-console/
 └── static/
     ├── style.css          # 样式
     ├── script.js          # 前端交互逻辑
-    └── captures/          # 抓拍图片存放目录（.gitignore 排除）
+    ├── captures/          # PIR/手动抓拍（.gitignore 排除）
+    └── vision_events/     # 危险区事件证据（.gitignore 排除）
 ```
 
 ---
@@ -155,12 +167,30 @@ smart-home-console/
 | `GET` | `/api/vision/status` | 查询摄像头、模型、人数和帧率 |
 | `GET` | `/api/vision/frame` | 获取最新 YOLO 标注 JPEG |
 | `GET` | `/api/vision/stream` | 获取共享 MJPEG 实时画面 |
+| `GET` | `/api/vision/zone` | 读取已保存的单个危险区域 |
+| `PUT` | `/api/vision/zone` | 保存 `x/y/width/height` 归一化矩形 |
+| `DELETE` | `/api/vision/zone` | 删除区域；若有活动事件则以 `zone_deleted` 关闭 |
+| `GET` | `/api/vision/events?limit=50` | 按 ID 倒序列出事件，`limit` 为 1–200 |
+| `POST` | `/api/vision/events/{event_id}/ack` | 确认未关闭事件并仅关闭视觉报警 |
 | `POST` | `/api/control` | 下发控制指令 `{"topic":"...","msg":"..."}` |
 | `GET` | `/api/captures` | 获取抓拍照片列表（倒序，最多 20 张） |
 | `POST` | `/api/capture/now` | 手动立即抓拍一张 |
 | `POST` | `/api/mock/pir` | 模拟 PIR 触发（仅模拟模式） |
 
 > 以上接口均可在 `/docs` 页面直接交互测试。
+
+上表中后五个是第二阶段新增路由。`zone` 为 `null` 或 `{x, y, width, height}`；坐标相对原始图像归一化，宽高至少为 `0.02` 且矩形不得越界。每条事件响应包含：
+
+| 字段 | 含义 |
+|------|------|
+| `id` | 事件 ID |
+| `started_at`, `ended_at` | UTC ISO-8601 开始/结束时间，未结束时 `ended_at=null` |
+| `snapshot_filename`, `snapshot_url` | 证据文件名和可访问 URL；写图失败时分别为空字符串和 `null` |
+| `max_people` | 该占用周期内区域中最多人数 |
+| `acknowledged_at` | 确认时间，未确认时为 `null` |
+| `close_reason` | `person_left`/`zone_deleted`/`server_restart`/`server_shutdown` 或 `null` |
+| `alarm_on_delivered`, `alarm_off_delivered` | 开/关视觉报警命令是否成功送达 |
+| `last_error` | 证据或命令送达的最终错误文本，无错误时为空字符串 |
 
 ### 命令行示例
 
@@ -197,6 +227,10 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 | `VISION_MODEL` | `VISION_MODEL` | `yolo11n.pt` | YOLO 模型名或本地路径 |
 | `VISION_CONFIDENCE` | `VISION_CONFIDENCE` | `0.40` | person 检测置信度 |
 | `VISION_FRAME_SKIP` | `VISION_FRAME_SKIP` | `2` | 每隔多少帧执行一次推理 |
+| `VISION_DB_PATH` | `VISION_DB_PATH` | `data/vision_events.db` | SQLite 数据库，相对路径以 `smart-home-console` 为基准 |
+| `VISION_EVENT_DIR` | `VISION_EVENT_DIR` | `static/vision_events` | 事件 JPEG 目录，相对路径以 `smart-home-console` 为基准 |
+| `VISION_ENTER_SECONDS` | `VISION_ENTER_SECONDS` | `2.0` | 连续入侵多久后触发 |
+| `VISION_EXIT_SECONDS` | `VISION_EXIT_SECONDS` | `3.0` | 连续空置多久后关闭事件并重新布防 |
 
 ---
 
@@ -210,6 +244,39 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 | 切换方式 | 页面右上角开关 或 `POST /api/mode` | 同上 |
 
 > 页面切换立即生效，重启后以 `config.MOCK_MODE` 为准。
+
+---
+
+## 🗺️ 危险区域操作和数据管理
+
+1. 在视觉面板点「编辑区域」，从一角拖到对角；拖拽必须在真实图像内开始，黑边不计入归一化坐标。
+2. 点「保存区域」写入 SQLite；刷新页面或重启服务后仍会恢复。点「取消」只丢弃未保存草图。
+3. 点「删除区域」会停用检测；若当时有活动事件，它会被关闭并下发 `vision_alarm_off`。
+4. 报警后点「确认并静音」只清除该事件的视觉蜂鸣源，事件仍活动、不会立即重新布防。人员连续离开 `VISION_EXIT_SECONDS` 后，事件以 `person_left` 关闭并重新布防。
+
+备份前先停止 `app.py`，避免 SQLite WAL 和 JPEG 在复制期间变化：
+
+```bash
+cd smart-home-console
+mkdir -p ../../vision-backup-YYYYMMDD
+cp -p data/vision_events.db ../../vision-backup-YYYYMMDD/
+cp -R static/vision_events ../../vision-backup-YYYYMMDD/
+```
+
+备份目录位于 `smart-home-console` 之外；不要提交数据库、`-wal`/`-shm` 或证据图。如需清空本地运行数据，同样先停服务并完成备份，再明确删除 `data/vision_events.db*` 和 `static/vision_events/` 内的 JPEG，保留 `.gitkeep`；下次启动会重建数据库。
+
+## ✅ 第二阶段真机验收（必须按顺序）
+
+1. 保存一个矩形，刷新页面并重启 `app.py`，确认区域仍存在。
+2. 在区域外走动至少 5 秒，确认没有新事件。
+3. 进入区域但少于 2 秒就离开，确认没有新事件。
+4. 连续进入至少 2 秒，确认恰好一条事件、一张快照、红色状态和蜂鸣器同时出现。
+5. 继续留在区域内 10 秒，确认没有重复事件。
+6. 点击确认，确认视觉报警静音，但事件仍活动且未重新布防。
+7. 离开至少 3 秒，确认事件关闭且系统重新布防。
+8. 使湿度高于 45%，触发后再清除视觉报警，确认湿度源仍使蜂鸣器保持开启。
+9. 断开再重连摄像头，确认缺帧期间不会误生成 `person_left`。
+10. 在活动事件期间重启 `app.py`，确认旧事件以 `server_restart` 关闭，且硬件收到强制的 `vision_alarm_off`。
 
 ---
 
