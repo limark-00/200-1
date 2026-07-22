@@ -38,7 +38,7 @@
                                           → Hi3861 多源蜂鸣器
 ```
 
-区域保存在 `data/vision_events.db` 的 `vision_zone` 表，事件保存在同库的 `vision_events` 表，证据图保存在 `static/vision_events/`。这些都是运行时数据，已由 `.gitignore` 排除。当摄像头无帧或断线时状态计时器不会用空检测结果推进，避免误生成 `person_left`。
+默认情况下，区域保存在 `data/vision_events.db` 的 `vision_zone` 表，事件保存在同库的 `vision_events` 表，证据图保存在 `static/vision_events/`。可分别用 `VISION_DB_PATH` 和 `VISION_EVENT_DIR` 覆盖；证据图始终通过专用的同源 `/vision-events/` URL 读取，API 不返回服务器绝对路径。当摄像头无帧或断线时状态计时器不会用空检测结果推进，避免误生成 `person_left`。
 
 ```
 ┌──────────┐     HTTP      ┌──────────────┐     HTTP API     ┌──────────┐
@@ -104,7 +104,7 @@ source .venv/bin/activate       # Linux / macOS
 pip install -r requirements.txt
 
 # 4. 配置巴法云（可选，不影响模拟模式）
-#    编辑 config.py，设置 BEMFA_UID 环境变量或修改默认值
+#    通过 BEMFA_UID 环境变量注入私钥，不要写入或提交源码
 
 # 5. 启动
 python app.py
@@ -172,14 +172,16 @@ smart-home-console/
 | `DELETE` | `/api/vision/zone` | 删除区域；若有活动事件则以 `zone_deleted` 关闭 |
 | `GET` | `/api/vision/events?limit=50` | 按 ID 倒序列出事件，`limit` 为 1–200 |
 | `POST` | `/api/vision/events/{event_id}/ack` | 确认未关闭事件并仅关闭视觉报警 |
+| `POST` | `/api/vision/alarm/silence` | 静音当前视觉报警；SQLite 降级且无事件行时仍可使用 |
+| `GET` | `/vision-events/{filename}` | 读取配置证据目录中的文件名，不接受任意路径 |
 | `POST` | `/api/control` | 下发控制指令 `{"topic":"...","msg":"..."}` |
 | `GET` | `/api/captures` | 获取抓拍照片列表（倒序，最多 20 张） |
 | `POST` | `/api/capture/now` | 手动立即抓拍一张 |
 | `POST` | `/api/mock/pir` | 模拟 PIR 触发（仅模拟模式） |
 
-> 以上接口均可在 `/docs` 页面直接交互测试。
+> `/api/...` 接口可在 `/docs` 页面交互测试；`/vision-events/` 是静态证据挂载，请使用事件响应返回的 `snapshot_url`。
 
-上表中后五个是第二阶段新增路由。`zone` 为 `null` 或 `{x, y, width, height}`；坐标相对原始图像归一化，宽高至少为 `0.02` 且矩形不得越界。每条事件响应包含：
+第二阶段视觉路由包含区域 CRUD、事件历史/确认、当前报警静音和证据读取。`zone` 为 `null` 或 `{x, y, width, height}`；坐标相对原始图像归一化，宽高至少为 `0.02` 且矩形不得越界。每条事件响应包含：
 
 | 字段 | 含义 |
 |------|------|
@@ -191,6 +193,8 @@ smart-home-console/
 | `close_reason` | `person_left`/`zone_deleted`/`server_restart`/`server_shutdown` 或 `null` |
 | `alarm_on_delivered`, `alarm_off_delivered` | 开/关视觉报警命令是否成功送达 |
 | `last_error` | 证据或命令送达的最终错误文本，无错误时为空字符串 |
+
+`GET /api/vision/status` 还返回 `storage_error`：空字符串表示本地事件存储健康；非空时应将其视为粘性降级状态，直到待补写的关闭或投递审计信息成功对账。存储故障不会暴露数据库或证据目录的绝对路径。
 
 ### 命令行示例
 
@@ -218,6 +222,7 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 | `BEMFA_UID` | `BEMFA_UID` | — | 巴法云私钥（必填） |
 | `BEMFA_TYPE` | `BEMFA_TYPE` | `1` | 1=MQTT，3=TCP |
 | `ENV_TOPIC` | `BEMFA_ENV_TOPIC` | `env004` | 下行控制主题 |
+| `ENV_PUB_TOPIC` | `BEMFA_ENV_PUB_TOPIC` | `<ENV_TOPIC>/up` | 开发板上行环境数据和 `vision_alarm` 状态的读取主题 |
 | `MOCK_MODE` | — | `False` | 启动默认模式 |
 | `APP_PORT` | — | `5001` | 服务端口 |
 | `CAPTURE_COOLDOWN` | — | `10` | 抓拍冷却时间（秒） |
@@ -228,7 +233,7 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 | `VISION_CONFIDENCE` | `VISION_CONFIDENCE` | `0.40` | person 检测置信度 |
 | `VISION_FRAME_SKIP` | `VISION_FRAME_SKIP` | `2` | 每隔多少帧执行一次推理 |
 | `VISION_DB_PATH` | `VISION_DB_PATH` | `data/vision_events.db` | SQLite 数据库，相对路径以 `smart-home-console` 为基准 |
-| `VISION_EVENT_DIR` | `VISION_EVENT_DIR` | `static/vision_events` | 事件 JPEG 目录，相对路径以 `smart-home-console` 为基准 |
+| `VISION_EVENT_DIR` | `VISION_EVENT_DIR` | `static/vision_events` | 事件 JPEG 写入及 `/vision-events/` 提供目录，相对路径以 `smart-home-console` 为基准 |
 | `VISION_ENTER_SECONDS` | `VISION_ENTER_SECONDS` | `2.0` | 连续入侵多久后触发 |
 | `VISION_EXIT_SECONDS` | `VISION_EXIT_SECONDS` | `3.0` | 连续空置多久后关闭事件并重新布防 |
 
@@ -254,7 +259,7 @@ curl -X POST http://127.0.0.1:5001/api/capture/now
 3. 点「删除区域」会停用检测；若当时有活动事件，它会被关闭并下发 `vision_alarm_off`。
 4. 报警后点「确认并静音」只清除该事件的视觉蜂鸣源，事件仍活动、不会立即重新布防。人员连续离开 `VISION_EXIT_SECONDS` 后，事件以 `person_left` 关闭并重新布防。
 
-备份前先停止 `app.py`，避免 SQLite WAL 和 JPEG 在复制期间变化：
+备份前先优雅停止 `app.py`，避免 SQLite WAL 和 JPEG 在复制期间变化。下列最简命令**仅适用于默认路径**：
 
 ```bash
 cd smart-home-console
@@ -263,7 +268,21 @@ cp -p data/vision_events.db ../../vision-backup-YYYYMMDD/
 cp -R static/vision_events ../../vision-backup-YYYYMMDD/
 ```
 
-备份目录位于 `smart-home-console` 之外；不要提交数据库、`-wal`/`-shm` 或证据图。如需清空本地运行数据，同样先停服务并完成备份，再明确删除 `data/vision_events.db*` 和 `static/vision_events/` 内的 JPEG，保留 `.gitkeep`；下次启动会重建数据库。
+使用环境变量覆盖后，必须从与服务相同的配置取值备份，不能继续假设默认目录：
+
+```bash
+cd smart-home-console
+vision_db_path="${VISION_DB_PATH:-data/vision_events.db}"
+vision_event_dir="${VISION_EVENT_DIR:-static/vision_events}"
+vision_backup_dir="../../vision-backup-YYYYMMDD"
+mkdir -p "$vision_backup_dir"
+cp -p "$vision_db_path" "$vision_backup_dir/"
+cp -R "$vision_event_dir" "$vision_backup_dir/vision_events"
+```
+
+备份目录应位于 `smart-home-console` 之外。现有 `.gitignore` 中数据库和证据的规则只覆盖默认路径；自定义路径应优先放在仓库外，否则必须将它的**精确路径**加入 `.git/info/exclude` 或团队共享的 `.gitignore`。每次备份、更改覆盖配置或提交前运行 `git status --short --ignored`，确认数据库、`-wal`/`-shm`、证据图和模型权重都未被跟踪。
+
+如需清空本地运行数据，同样先停服务并完成备份，核对 `VISION_DB_PATH` 和 `VISION_EVENT_DIR` 的实际值后只删除这两个精确目标；默认证据目录需保留 `.gitkeep`。不要用未检查的递归命令、宽泛通配符或空环境变量删除数据。
 
 ## ✅ 第二阶段真机验收（必须按顺序）
 
@@ -276,7 +295,8 @@ cp -R static/vision_events ../../vision-backup-YYYYMMDD/
 7. 离开至少 3 秒，确认事件关闭且系统重新布防。
 8. 使湿度高于 45%，触发后再清除视觉报警，确认湿度源仍使蜂鸣器保持开启。
 9. 断开再重连摄像头，确认缺帧期间不会误生成 `person_left`。
-10. 在活动事件期间重启 `app.py`，确认旧事件以 `server_restart` 关闭，且硬件收到强制的 `vision_alarm_off`。
+10. 在活动事件期间对验收实例执行优雅重启（例如 `systemctl restart`），确认当前事件以 `server_shutdown` 关闭，且硬件收到强制的 `vision_alarm_off`。
+11. 仅在可恢复的独立验收实例上，先记录该实例的确切 PID，再用 `kill -9 <受控验收进程PID>` 模拟受控非正常终止。重启后确认遗留事件才以 `server_restart` 恢复关闭，并且强制发送 `vision_alarm_off`；不要对共享或生产实例执行此步骤。
 
 ---
 
@@ -296,23 +316,31 @@ cp -R static/vision_events ../../vision-backup-YYYYMMDD/
 
 ## 📦 部署（Linux + Nginx + systemd）
 
+安全边界：**本应用不包含内置身份认证**。`PUT`/`POST`/`DELETE` 控制与变更路由、`/api/vision/events` 历史、`/vision-events/` 证据以及 `/docs` 都包含敏感能力或信息，禁止直接暴露到公网。部署时必须选择并验证下列边界之一：
+
+- 仅允许可信局域网网段，并同时用主机/云防火墙拒绝公网入站；
+- 只允许经 VPN 进入的已授权用户访问；
+- 若业务必须通过公网到达，在 TLS 终端上配置可审计的反向代理身份认证，默认拒绝未认证请求。
+
+下方 Nginx 是一个**局域网限制示例**，`192.168.1.20` 必须替换为服务主机的局域网 IP，并与实际可信网段和防火墙规则一起复核。它不是公网部署配置。
+
 ```bash
 # 1. 安装依赖
+cd /path/to/smart-home-console
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 2. 配置 Nginx 反向代理
+# 2. 配置仅限局域网的 Nginx 反向代理
 sudo tee /etc/nginx/sites-available/smart-home << 'EOF'
 server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$host$request_uri;
-}
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-    ssl_certificate /etc/nginx/cert/xxx.pem;
-    ssl_certificate_key /etc/nginx/cert/xxx.key;
+    listen 192.168.1.20:80;
+    server_name _;
+
+    allow 192.168.0.0/16;
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    deny all;
+
     location / {
         proxy_pass http://127.0.0.1:5001;
         proxy_set_header Host $host;
@@ -336,8 +364,8 @@ After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/path/to/smart-home-console
-Environment="PATH=/path/to/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/path/to/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 5001
+Environment="PATH=/path/to/smart-home-console/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/path/to/smart-home-console/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 5001
 Restart=always
 RestartSec=3
 

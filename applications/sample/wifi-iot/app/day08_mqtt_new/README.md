@@ -20,7 +20,7 @@ MQTT
 
 ## 一、目录放置
 
-将本目录内全部文件复制到：
+本目录必须放入一棵**完整且兼容的 OpenHarmony 工程树**后才能执行 Hi3861 构建。将本目录内全部文件复制到该工程树的：
 
 ```text
 applications/sample/wifi-iot/app/day08_mqtt_new/
@@ -179,13 +179,15 @@ WiFi: Connected, starting DHCP
 
 ## 八、Ubuntu/OpenHarmony 编译和主机可移植测试
 
-在已配置 OpenHarmony/Hi3861 工具链的 Ubuntu 项目仓库根目录执行：
+本仓库是源码快照：根目录的 `build.py -> build/lite/build.py` 是符号链接，但链接目标在本仓库快照中不存在。因此不能在这份快照中声称 OpenHarmony 全量构建成功，也不应将缺失目标误判为 `day08_mqtt_new` 源码的编译错误。
+
+请先按第一节将目录放入完整且兼容的 OpenHarmony 工程树，配置该工程所需的 Ubuntu/Hi3861 工具链和父级 `BUILD.gn`，然后从**完整工程树根目录**执行以下原始构建命令：
 
 ```bash
 python build.py wifiiot 2>&1 | tee build.log
 ```
 
-应成功链接 `Hi3861_wifiiot_app.out`，并可在日志中核对：
+在上述外部完整工程环境中，验收预期是成功链接 `Hi3861_wifiiot_app.out`，并在日志中核对：
 
 重新编译后搜索日志：
 
@@ -196,7 +198,7 @@ grep -niE "day08_alarm\.c|day08_mqtt_new|wifi_core|pahomqtt" build.log
 无 OpenHarmony 工具链时只验证纯 C 状态组件（仓库根目录）：
 
 ```bash
-cc -std=c99 -Wall -Wextra -Werror \
+cc -std=c99 -pedantic -Wall -Wextra -Werror \
   -I applications/sample/wifi-iot/app/day08_mqtt_new \
   applications/sample/wifi-iot/app/day08_mqtt_new/day08_alarm.c \
   applications/sample/wifi-iot/app/day08_mqtt_new/tests/test_day08_alarm.c \

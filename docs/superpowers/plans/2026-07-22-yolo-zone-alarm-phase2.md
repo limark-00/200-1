@@ -812,7 +812,7 @@ Define `VisionZoneBody` with bounded floats and a model-level `x + width` / `y +
 
 Map `EventNotFoundError` to 404, `EventClosedError` to 409, persistence errors to 503, and unexpected errors to the existing `{ok: false, error: string}` JSON format.
 
-For event responses, add a derived `snapshot_url`: use `/static/vision_events/{URL-encoded filename}` when `snapshot_filename` is nonempty and `null` otherwise. The route must never expose the absolute evidence-directory path. Validate `limit` with FastAPI bounds `ge=1, le=200` so invalid values return 422.
+For event responses, add a derived `snapshot_url`: use the dedicated `/vision-events/{URL-encoded basename}` mount backed by `VISION_EVENT_DIR` when `snapshot_filename` is nonempty and `null` otherwise. Reject path components and never expose the absolute evidence-directory path. Validate `limit` with FastAPI bounds `ge=1, le=200` so invalid values return 422.
 
 - [x] **Step 4: Update singleton construction and lifespan**
 
@@ -958,10 +958,10 @@ Add:
 
 - phase-2 architecture and data paths;
 - environment variables `VISION_DB_PATH`, `VISION_EVENT_DIR`, `VISION_ENTER_SECONDS`, and `VISION_EXIT_SECONDS`;
-- all five new API routes and event response fields;
+- all zone/event routes, the persistence-independent current-alarm silence route, the dedicated evidence URL, and event/status response fields;
 - drawing, saving, deleting, acknowledging, and re-arming behavior;
 - commands `vision_alarm_on/off` and the combined buzzer truth table;
-- OpenHarmony build command `python build.py wifiiot` from the repository root;
+- OpenHarmony build command `python build.py wifiiot` from the complete compatible OpenHarmony tree root;
 - serial-output checks for both vision commands and `vision_alarm` telemetry;
 - backup/removal instructions for the runtime DB and evidence directory without committing either.
 
@@ -993,7 +993,7 @@ python build.py wifiiot
 
 Expected: `Hi3861_wifiiot_app.out` links successfully and build logs include `day08_alarm.c` and `day08_mqtt_new`.
 
-> Deferred: requires the project configured Ubuntu OpenHarmony/Hi3861 toolchain; it is not available in this Mac worktree.
+> Deferred: requires a complete compatible OpenHarmony tree and the project-configured Ubuntu OpenHarmony/Hi3861 toolchain. In this repository snapshot, `build.py -> build/lite/build.py` has a missing target, so no OpenHarmony build result is claimed here.
 
 - [ ] **Step 5: Perform real hardware acceptance**
 
@@ -1008,7 +1008,8 @@ Verify in order:
 7. Leave for at least 3 seconds; event closes and system re-arms.
 8. Force humidity above 45%, trigger then clear vision alarm, and confirm humidity still holds the buzzer on.
 9. Disconnect/reconnect the camera and confirm no false `person_left` event is generated during missing frames.
-10. Restart `app.py` during an active event and confirm stale state closes with `server_restart` and hardware receives forced vision-off.
+10. During an active event, perform a graceful restart (优雅重启, for example `systemctl restart`) and confirm the current event closes with `server_shutdown` and hardware receives forced vision-off.
+11. On a recoverable, isolated acceptance instance only, terminate its exact recorded PID with `kill -9 <controlled-test-PID>` to simulate a controlled unclean exit (受控非正常终止); restart it and confirm the stale event closes with `server_restart` and hardware receives forced vision-off.
 
 > Deferred: requires the project Ubuntu machine, connected Hi3861/Bemfa hardware path, and a live camera browser acceptance setup.
 
