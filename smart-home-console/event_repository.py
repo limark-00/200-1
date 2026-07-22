@@ -209,13 +209,16 @@ class EventRepository:
             self._fetch_event(connection, event_id)
             if error_text:
                 connection.execute(
-                    f"UPDATE vision_events SET {delivery_column} = ?, "
+                    f"UPDATE vision_events "
+                    f"SET {delivery_column} = MAX({delivery_column}, ?), "
                     "last_error = ? WHERE id = ?",
                     (int(delivered), error_text, event_id),
                 )
             else:
                 connection.execute(
-                    f"UPDATE vision_events SET {delivery_column} = ? WHERE id = ?",
+                    f"UPDATE vision_events "
+                    f"SET {delivery_column} = MAX({delivery_column}, ?) "
+                    "WHERE id = ?",
                     (int(delivered), event_id),
                 )
             connection.commit()

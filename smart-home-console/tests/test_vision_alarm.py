@@ -100,6 +100,23 @@ class VisionAlarmControllerTests(unittest.TestCase):
             [(14, "vision_alarm_off", False, "broker unavailable")],
         )
 
+    def test_delivery_callback_failure_is_surfaced_without_replacing_sender_error(self):
+        def failing_callback(*_args):
+            raise OSError("database unavailable")
+
+        controller = make_controller(
+            lambda _command: {"ok": True},
+            delivery_callback=failing_callback,
+        )
+
+        controller._deliver(AlarmTask(True, 14))
+
+        self.assertEqual(controller.get_last_error(), "")
+        self.assertEqual(
+            controller.get_callback_error(),
+            "视觉告警投递记录暂未保存",
+        )
+
     def test_later_success_clears_last_error(self):
         responses = iter(
             [

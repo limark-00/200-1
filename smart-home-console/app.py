@@ -76,7 +76,14 @@ zone_detector = ZoneDetector(
 )
 alarm_controller = VisionAlarmController(
     lambda command: bemfa_api.send_msg(config.ENV_TOPIC, command),
-    delivery_callback=event_repository.mark_delivery,
+    delivery_callback=lambda event_id, command, delivered, error: (
+        vision_service.record_alarm_delivery(
+            event_id,
+            command,
+            delivered,
+            error,
+        )
+    ),
 )
 vision_service = VisionService(
     VisionSettings(
@@ -454,6 +461,16 @@ async def api_vision_event_ack(event_id: int):
     except (sqlite3.Error, OSError) as exc:
         return _vision_error(exc, 503)
     except Exception as exc:  # noqa: BLE001
+        return _vision_error(exc, 500)
+
+
+@app.post("/api/vision/alarm/silence", summary="静音当前视觉告警")
+async def api_vision_alarm_silence():
+    try:
+        return {"ok": True, "alarm": vision_service.silence_current_alarm()}
+    except EventClosedError as exc:
+        return _vision_error(exc, 409)
+    except Exception as exc:  # Silence itself does not require SQLite.
         return _vision_error(exc, 500)
 
 

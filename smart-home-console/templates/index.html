@@ -1856,18 +1856,12 @@
 
     async function acknowledgeActiveVisionEvent() {
       const button = document.getElementById("visionAckButton");
-      const eventId = Number(button.dataset.eventId);
-
-      if (!Number.isInteger(eventId) || eventId < 1) {
-        return;
-      }
 
       button.disabled = true;
       try {
-        const response = await fetch(
-          `/api/vision/events/${eventId}/ack`,
-          { method: "POST" }
-        );
+        const response = await fetch("/api/vision/alarm/silence", {
+          method: "POST"
+        });
         await readVisionResponse(response, "确认告警失败");
         await Promise.all([
           refreshVisionStatus(),
@@ -1924,12 +1918,17 @@
             ? `事件 #${activeEventId} 已确认静音`
             : `活动事件 #${activeEventId}`;
       } else {
-        activeAlert.firstElementChild.textContent = "当前无活动告警";
+        activeAlert.firstElementChild.textContent = alarmActive
+          ? "当前视觉告警正在响铃"
+          : "当前无活动告警";
       }
 
-      ackButton.hidden = !alarmActive || activeEventId === null ||
-        activeEventId === undefined;
-      if (!ackButton.hidden) {
+      ackButton.hidden = !alarmActive;
+      if (
+        !ackButton.hidden &&
+        activeEventId !== null &&
+        activeEventId !== undefined
+      ) {
         ackButton.dataset.eventId = String(activeEventId);
       } else {
         delete ackButton.dataset.eventId;
@@ -1965,7 +1964,8 @@
 
       errorText.textContent = [
         status.last_error,
-        status.alarm_delivery_error
+        status.alarm_delivery_error,
+        status.storage_error
       ].filter(Boolean).join("；");
 
       const alarmChanged =

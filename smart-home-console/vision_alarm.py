@@ -40,6 +40,7 @@ class VisionAlarmController:
         self._generation = 0
         self._pending = 0
         self._last_error = ""
+        self._callback_error = ""
         self._stopping = False
         self._wake = threading.Event()
 
@@ -110,6 +111,10 @@ class VisionAlarmController:
         with self._lock:
             return self._last_error
 
+    def get_callback_error(self) -> str:
+        with self._lock:
+            return self._callback_error
+
     def _run(self) -> None:
         while True:
             task = self._queue.get()
@@ -161,8 +166,13 @@ class VisionAlarmController:
         try:
             self._delivery_callback(task.event_id, command, delivered, error)
         except Exception:
-            # Persistence callbacks must not terminate the delivery worker.
-            pass
+            # Persistence callbacks must not terminate delivery or replace the
+            # sender's safe error state, but the failure must remain visible.
+            with self._lock:
+                self._callback_error = "视觉告警投递记录暂未保存"
+        else:
+            with self._lock:
+                self._callback_error = ""
 
     def _is_superseded(self, task: AlarmTask) -> bool:
         with self._lock:

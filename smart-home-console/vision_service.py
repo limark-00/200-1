@@ -12,9 +12,12 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Callable, Iterator
 
-from event_repository import EventRepository
+from event_repository import EventClosedError, EventNotFoundError, EventRepository
 from vision_alarm import VisionAlarmController
 from zone_detector import NormalizedZone, ZoneDetector, ZoneState, ZoneUpdate
+
+
+STORAGE_UNAVAILABLE_ERROR = "视觉事件存储不可用"
 
 
 @dataclass(frozen=True)
@@ -186,6 +189,12 @@ class VisionService:
         self._enter_elapsed = 0.0
         self._exit_elapsed = 0.0
         self._safety_clock = getattr(zone_detector, "_clock", time.monotonic)
+        self._storage_initialized = False
+        self._storage_error = ""
+        self._pending_closures: dict[int, str] = {}
+        self._pending_delivery_audits: dict[
+            tuple[int, str], tuple[bool, str]
+        ] = {}
 
     def start(self) -> bool:
         """启动后台视觉线程；重复调用不会创建第二个线程。"""
@@ -356,6 +365,7 @@ class VisionService:
                     if self._alarm_controller is not None
                     else ""
                 ),
+                "storage_error": self._storage_error,
             }
         status.update(safety_status)
         return status
@@ -364,7 +374,13 @@ class VisionService:
         """Persist a zone before applying it to the in-memory detector."""
         repository, detector = self._require_safety_storage()
         with self._safety_lock:
-            repository.save_zone(zone)
+            self._prepare_storage_locked()
+            try:
+                repository.save_zone(zone)
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+                raise
+            self._clear_storage_error_if_reconciled_locked()
             detector.set_zone(zone)
             return asdict(zone)
 
@@ -372,44 +388,170 @@ class VisionService:
         """Persist zone deletion and safely close an active event."""
         repository, detector = self._require_safety_storage()
         with self._safety_lock:
-            repository.delete_zone()
+            self._prepare_storage_locked()
+            try:
+                repository.delete_zone()
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+                raise
             event_id = detector.clear_zone()
             self._reset_safety_observation()
             if event_id is None:
+                self._clear_storage_error_if_reconciled_locked()
                 return
             try:
                 repository.close_event(event_id, "zone_deleted")
-            finally:
-                if self._alarm_controller is not None:
-                    self._alarm_controller.set_alarm(False, event_id=event_id)
+            except Exception as exc:
+                self._queue_pending_closure_locked(
+                    event_id,
+                    "zone_deleted",
+                    exc,
+                )
+            else:
+                self._clear_storage_error_if_reconciled_locked()
+            if self._alarm_controller is not None:
+                self._alarm_controller.set_alarm(False, event_id=event_id)
 
     def list_events(self, limit: int = 50) -> list[dict]:
         if self._event_repository is None:
             raise RuntimeError("视觉事件存储未配置")
-        return self._event_repository.list_events(limit)
+        with self._safety_lock:
+            self._prepare_storage_locked()
+            try:
+                events = self._event_repository.list_events(limit)
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+                raise
+            self._clear_storage_error_if_reconciled_locked()
+            return events
 
     def acknowledge_event(self, event_id: int) -> dict:
         """Persist acknowledgment, silence detector state, then enqueue off."""
         repository, detector = self._require_safety_storage()
         with self._safety_lock:
-            event = repository.acknowledge_event(event_id)
+            self._prepare_storage_locked()
+            try:
+                event = repository.get_event(event_id)
+            except (EventNotFoundError, EventClosedError):
+                raise
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+                raise
+            if event["ended_at"] is not None:
+                raise EventClosedError("该视觉事件已结束")
+            detector_status = detector.get_status()
+            if (
+                detector_status["event_id"] != event_id
+                or detector_status["state"]
+                not in {
+                    ZoneState.ALARM_ACTIVE.value,
+                    ZoneState.ALARM_SILENCED.value,
+                }
+            ):
+                raise EventClosedError("该事件不是当前视觉告警")
+            try:
+                event = repository.acknowledge_event(event_id)
+            except (EventNotFoundError, EventClosedError):
+                raise
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+                raise
+            self._clear_storage_error_if_reconciled_locked()
             transitioned = detector.acknowledge(event_id)
             if transitioned and self._alarm_controller is not None:
                 self._alarm_controller.set_alarm(False, event_id=event_id)
             return event
 
+    def silence_current_alarm(self) -> dict[str, Any]:
+        """Silence hardware/detector state without requiring persistence."""
+        if self._zone_detector is None:
+            raise RuntimeError("危险区域检测器未配置")
+        with self._safety_lock:
+            detector_status = self._zone_detector.get_status()
+            if detector_status["state"] not in {
+                ZoneState.ALARM_ACTIVE.value,
+                ZoneState.ALARM_SILENCED.value,
+            }:
+                raise EventClosedError("当前没有可静音的视觉告警")
+
+            event_id = detector_status["event_id"]
+            persisted = False
+            if event_id is not None and self._event_repository is not None:
+                try:
+                    self._prepare_storage_locked()
+                    self._event_repository.acknowledge_event(event_id)
+                    persisted = True
+                    self._clear_storage_error_if_reconciled_locked()
+                except Exception as exc:  # Silence must remain fail-safe.
+                    self._record_storage_failure_locked(exc)
+
+            self._zone_detector.acknowledge_current()
+            if self._alarm_controller is not None:
+                self._alarm_controller.set_alarm(
+                    False,
+                    event_id=event_id,
+                    force=True,
+                )
+            return {
+                "silenced": True,
+                "persisted": persisted,
+                "event_id": event_id,
+            }
+
+    def record_alarm_delivery(
+        self,
+        event_id: int | None,
+        command: str,
+        delivered: bool,
+        error_text: str,
+    ) -> None:
+        """Persist delivery audit or retain it for in-memory reconciliation."""
+        if event_id is None:
+            return
+        if self._event_repository is None:
+            return
+        with self._safety_lock:
+            audit_key = (event_id, command)
+            try:
+                self._prepare_storage_locked()
+                self._event_repository.mark_delivery(
+                    event_id,
+                    command,
+                    delivered,
+                    error_text,
+                )
+            except Exception as exc:
+                previous = self._pending_delivery_audits.get(audit_key)
+                ever_delivered = delivered or bool(previous and previous[0])
+                latest_error = error_text or (previous[1] if previous else "")
+                self._pending_delivery_audits[audit_key] = (
+                    ever_delivered,
+                    latest_error,
+                )
+                self._record_storage_failure_locked(exc)
+                raise
+            self._pending_delivery_audits.pop(audit_key, None)
+            self._clear_storage_error_if_reconciled_locked()
+
     def initialize_safety(self) -> None:
         """Recover persisted safety state before vision processing starts."""
-        if self._event_repository is not None:
-            self._event_repository.initialize()
-            zone = self._event_repository.get_zone()
+        with self._safety_lock:
             if self._zone_detector is not None:
-                with self._safety_lock:
-                    self._zone_detector.clear_zone()
-                    self._reset_safety_observation()
-                    if zone is not None:
+                self._zone_detector.clear_zone()
+                self._reset_safety_observation()
+            if self._event_repository is not None:
+                try:
+                    self._event_repository.initialize()
+                    self._storage_initialized = True
+                    zone = self._event_repository.get_zone()
+                    self._event_repository.recover_open_events("server_restart")
+                except Exception as exc:
+                    self._storage_initialized = False
+                    self._record_storage_failure_locked(exc)
+                else:
+                    if self._zone_detector is not None and zone is not None:
                         self._zone_detector.set_zone(zone)
-            self._event_repository.recover_open_events("server_restart")
+                    self._clear_storage_error_if_reconciled_locked()
         if self._alarm_controller is not None:
             self._alarm_controller.start()
             self._alarm_controller.set_alarm(False, event_id=None, force=True)
@@ -426,7 +568,12 @@ class VisionService:
                 try:
                     self._event_repository.close_event(event_id, "server_shutdown")
                 except Exception as exc:  # Shutdown must still force alarm-off.
-                    close_error = str(exc) or exc.__class__.__name__
+                    close_error = STORAGE_UNAVAILABLE_ERROR
+                    self._queue_pending_closure_locked(
+                        event_id,
+                        "server_shutdown",
+                        exc,
+                    )
             if self._alarm_controller is not None:
                 self._alarm_controller.set_alarm(
                     False,
@@ -500,7 +647,7 @@ class VisionService:
     def _coordinate_zone_update(self, update: ZoneUpdate, jpeg: bytes) -> str:
         """Apply local event side effects; alarm calls only enqueue delivery."""
         self._people_in_zone = update.people_in_zone
-        error = ""
+        error = self._try_reconcile_storage_locked()
 
         if update.alarm_started:
             filename, snapshot_error = self._write_event_snapshot(jpeg)
@@ -517,7 +664,8 @@ class VisionService:
                         self._zone_detector.bind_event(event_id)
                     self._persisted_max_people = update.max_people
                 except Exception as exc:  # Keep detection and hardware alarm alive.
-                    error = str(exc) or exc.__class__.__name__
+                    self._record_storage_failure_locked(exc)
+                    error = STORAGE_UNAVAILABLE_ERROR
                     event_id = None
                 if event_id is not None and snapshot_error:
                     try:
@@ -526,7 +674,10 @@ class VisionService:
                             snapshot_error,
                         )
                     except Exception as exc:
-                        error = str(exc) or exc.__class__.__name__
+                        self._record_storage_failure_locked(exc)
+                        error = STORAGE_UNAVAILABLE_ERROR
+                    else:
+                        self._clear_storage_error_if_reconciled_locked()
             if snapshot_error:
                 error = error or snapshot_error
             if self._alarm_controller is not None:
@@ -550,7 +701,8 @@ class VisionService:
                 )
                 self._persisted_max_people = update.max_people
             except Exception as exc:
-                error = str(exc) or exc.__class__.__name__
+                self._record_storage_failure_locked(exc)
+                error = STORAGE_UNAVAILABLE_ERROR
 
         if update.alarm_cleared:
             cleared_event_id = update.event_id
@@ -561,7 +713,15 @@ class VisionService:
                         "person_left",
                     )
             except Exception as exc:
-                error = str(exc) or exc.__class__.__name__
+                if cleared_event_id is not None:
+                    self._queue_pending_closure_locked(
+                        cleared_event_id,
+                        "person_left",
+                        exc,
+                    )
+                error = STORAGE_UNAVAILABLE_ERROR
+            else:
+                self._clear_storage_error_if_reconciled_locked()
             finally:
                 self._persisted_max_people = 0
                 if self._alarm_controller is not None:
@@ -661,6 +821,78 @@ class VisionService:
         self._exit_started_at = None
         self._enter_elapsed = 0.0
         self._exit_elapsed = 0.0
+
+    def _record_storage_failure_locked(self, _exc: Exception) -> None:
+        # Exception details may include database paths.  Keep only a stable,
+        # operator-facing health message in state returned by the API.
+        self._storage_error = STORAGE_UNAVAILABLE_ERROR
+
+    def _queue_pending_closure_locked(
+        self,
+        event_id: int,
+        close_reason: str,
+        exc: Exception,
+    ) -> None:
+        self._pending_closures[event_id] = close_reason
+        self._record_storage_failure_locked(exc)
+
+    def _prepare_storage_locked(self) -> None:
+        if self._event_repository is None:
+            raise RuntimeError("视觉事件存储未配置")
+        if not self._storage_initialized or self._storage_error:
+            try:
+                self._event_repository.initialize()
+            except Exception as exc:
+                self._storage_initialized = False
+                self._record_storage_failure_locked(exc)
+                raise
+            self._storage_initialized = True
+        self._reconcile_pending_storage_locked()
+        self._clear_storage_error_if_reconciled_locked()
+
+    def _try_reconcile_storage_locked(self) -> str:
+        if self._event_repository is None:
+            return ""
+        try:
+            self._prepare_storage_locked()
+        except Exception:
+            return STORAGE_UNAVAILABLE_ERROR
+        return self._storage_error
+
+    def _reconcile_pending_storage_locked(self) -> None:
+        if self._event_repository is None:
+            return
+
+        for event_id, close_reason in tuple(self._pending_closures.items()):
+            try:
+                self._event_repository.close_event(event_id, close_reason)
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+            else:
+                self._pending_closures.pop(event_id, None)
+
+        for audit_key, audit in tuple(self._pending_delivery_audits.items()):
+            event_id, command = audit_key
+            delivered, error_text = audit
+            try:
+                self._event_repository.mark_delivery(
+                    event_id,
+                    command,
+                    delivered,
+                    error_text,
+                )
+            except Exception as exc:
+                self._record_storage_failure_locked(exc)
+            else:
+                self._pending_delivery_audits.pop(audit_key, None)
+
+    def _clear_storage_error_if_reconciled_locked(self) -> None:
+        if (
+            self._storage_initialized
+            and not self._pending_closures
+            and not self._pending_delivery_audits
+        ):
+            self._storage_error = ""
 
     def _require_safety_storage(self) -> tuple[EventRepository, ZoneDetector]:
         if self._event_repository is None:

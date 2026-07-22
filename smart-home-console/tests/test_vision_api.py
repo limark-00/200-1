@@ -116,6 +116,9 @@ class FakeVisionService:
             return dict(event)
         raise EventNotFoundError(f"event {event_id} was not found")
 
+    def silence_current_alarm(self):
+        return {"silenced": True, "persisted": False, "event_id": None}
+
 
 class VisionApiTests(unittest.TestCase):
     def open_client(self, fake: FakeVisionService):
@@ -264,6 +267,17 @@ class VisionApiTests(unittest.TestCase):
         self.assertEqual(
             first.json()["event"]["acknowledged_at"],
             second.json()["event"]["acknowledged_at"],
+        )
+
+    def test_current_alarm_silence_does_not_require_event_id(self):
+        fake = FakeVisionService()
+        with self.open_client(fake), TestClient(app_module.app) as client:
+            response = client.post("/api/vision/alarm/silence")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["alarm"],
+            {"silenced": True, "persisted": False, "event_id": None},
         )
 
     def test_zone_persistence_error_returns_503(self):

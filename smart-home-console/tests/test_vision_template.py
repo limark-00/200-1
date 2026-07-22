@@ -56,6 +56,7 @@ class VisionTemplateTests(unittest.TestCase):
         self.assertIn('fetch("/api/vision/events"', self.html)
         self.assertIn("function imageContentRect()", self.html)
         self.assertIn("function normalizedZoneFromDrag", self.html)
+        self.assertIn('fetch("/api/vision/alarm/silence"', self.html)
 
     def test_event_refresh_is_single_flight_with_one_queued_rerun(self):
         self.assertIn("let visionEventRefreshPromise = null;", self.html)

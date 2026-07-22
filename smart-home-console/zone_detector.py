@@ -180,6 +180,14 @@ class ZoneDetector:
                 return True
             return False
 
+    def acknowledge_current(self) -> bool:
+        """Silence the current alarm even when persistence has no event ID."""
+        with self._lock:
+            if self._state == ZoneState.ALARM_ACTIVE:
+                self._state = ZoneState.ALARM_SILENCED
+                return True
+            return self._state == ZoneState.ALARM_SILENCED
+
     def get_status(self) -> dict:
         with self._lock:
             return {

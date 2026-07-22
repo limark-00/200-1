@@ -138,6 +138,20 @@ class EventRepositoryTests(unittest.TestCase):
         self.assertTrue(delivered["alarm_on_delivered"])
         self.assertEqual(delivered["last_error"], "snapshot write failed")
 
+    def test_delivery_flags_are_monotonic_across_repeated_attempts(self):
+        event_id = self.repo.create_event("event.jpg", 1)
+        self.repo.mark_delivery(event_id, "vision_alarm_on", True, "")
+
+        repeated = self.repo.mark_delivery(
+            event_id,
+            "vision_alarm_on",
+            False,
+            "safe delivery failure",
+        )
+
+        self.assertTrue(repeated["alarm_on_delivered"])
+        self.assertEqual(repeated["last_error"], "safe delivery failure")
+
     def test_record_error_rejects_empty_text(self):
         event_id = self.repo.create_event("event.jpg", 1)
 

@@ -540,7 +540,35 @@ class VisionServiceTests(unittest.TestCase):
         self.assertEqual(repository.list_events(), [])
         self.assertIsNone(detector.get_status()["event_id"])
         self.assertEqual(alarm.targets, [(True, None)])
-        self.assertIn("database is read-only", service.get_status()["last_error"])
+        self.assertEqual(
+            service.get_status()["last_error"],
+            "视觉事件存储不可用",
+        )
+
+    def test_alarm_without_event_row_can_still_be_silenced(self):
+        class CreateFailingRepository(EventRepository):
+            def create_event(self, snapshot_filename, people_count):
+                raise OSError("database is read-only")
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        repository = CreateFailingRepository(
+            os.path.join(temporary.name, "events.db")
+        )
+        service, detector, _repository, alarm, clock, _directory = (
+            self.make_safety_service(repository=repository)
+        )
+        service.process_frame(SafetyModel(), FakeFrame())
+        clock.advance(2.0)
+        service.process_frame(SafetyModel(), FakeFrame())
+
+        result = service.silence_current_alarm()
+
+        self.assertTrue(result["silenced"])
+        self.assertFalse(result["persisted"])
+        self.assertIsNone(result["event_id"])
+        self.assertEqual(detector.get_status()["state"], "alarm_silenced")
+        self.assertEqual(alarm.targets[-1], (False, None))
 
     def test_snapshot_error_update_failure_keeps_created_event_id(self):
         class ErrorUpdateFailingRepository(EventRepository):
@@ -824,6 +852,7 @@ class VisionServiceTests(unittest.TestCase):
             "enter_elapsed",
             "exit_elapsed",
             "alarm_delivery_error",
+            "storage_error",
         }
 
         status = service.get_status()
@@ -833,6 +862,131 @@ class VisionServiceTests(unittest.TestCase):
             status["zone"],
             {"x": 0.1, "y": 0.1, "width": 0.8, "height": 0.8},
         )
+
+    def test_initialize_storage_failure_keeps_detector_disabled_and_forces_off(self):
+        class InitializeFailingRepository:
+            def initialize(self):
+                raise OSError("/private/secret/events.db is unavailable")
+
+        detector = ZoneDetector(2.0, 3.0, clock=FakeClock())
+        detector.set_zone(NormalizedZone(0.1, 0.1, 0.8, 0.8))
+        alarm = RecordingAlarm()
+        service = self.make_service(
+            zone_detector=detector,
+            event_repository=InitializeFailingRepository(),
+            alarm_controller=alarm,
+        )
+
+        service.initialize_safety()
+
+        self.assertEqual(detector.get_status()["state"], "disabled")
+        self.assertEqual(alarm.targets, [(False, None)])
+        self.assertEqual(
+            service.get_status()["storage_error"],
+            "视觉事件存储不可用",
+        )
+        self.assertNotIn("/private/secret", str(service.get_status()))
+
+    def test_acknowledgment_rejects_open_row_that_is_not_detector_event(self):
+        service, _detector, repository, _alarm, _clock, _directory = (
+            self.active_safety_service()
+        )
+        current_event_id = repository.list_events()[0]["id"]
+        different_event_id = repository.create_event("different.jpg", 1)
+
+        with self.assertRaises(Exception) as raised:
+            service.acknowledge_event(different_event_id)
+
+        self.assertEqual(raised.exception.__class__.__name__, "EventClosedError")
+        self.assertIsNone(
+            repository.get_event(different_event_id)["acknowledged_at"]
+        )
+        self.assertIsNone(repository.get_event(current_event_id)["acknowledged_at"])
+
+    def test_failed_event_close_is_retried_and_error_stays_visible(self):
+        class CloseOnceRepository(EventRepository):
+            def __init__(self, db_path):
+                super().__init__(db_path)
+                self.fail_close = True
+
+            def close_event(self, event_id, close_reason):
+                if self.fail_close and close_reason == "person_left":
+                    self.fail_close = False
+                    raise OSError("database temporarily unavailable")
+                return super().close_event(event_id, close_reason)
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        repository = CloseOnceRepository(
+            os.path.join(temporary.name, "events.db")
+        )
+        service, _detector, repository, _alarm, clock, _directory = (
+            self.active_safety_service(repository=repository)
+        )
+        event_id = repository.list_events()[0]["id"]
+        empty_model = SafetyModel(rows=[])
+        service.process_frame(empty_model, FakeFrame())
+        clock.advance(3.0)
+
+        service.process_frame(empty_model, FakeFrame())
+
+        self.assertIsNone(repository.get_event(event_id)["ended_at"])
+        self.assertEqual(
+            service.get_status()["storage_error"],
+            "视觉事件存储不可用",
+        )
+
+        service.process_frame(empty_model, FakeFrame())
+
+        self.assertEqual(
+            repository.get_event(event_id)["close_reason"],
+            "person_left",
+        )
+        self.assertEqual(service.get_status()["storage_error"], "")
+
+    def test_failed_delivery_audit_is_retried_after_storage_recovers(self):
+        class AuditOnceRepository(EventRepository):
+            def __init__(self, db_path):
+                super().__init__(db_path)
+                self.fail_audit = True
+
+            def mark_delivery(self, event_id, command, delivered, error_text):
+                if self.fail_audit:
+                    self.fail_audit = False
+                    raise OSError("database temporarily unavailable")
+                return super().mark_delivery(
+                    event_id,
+                    command,
+                    delivered,
+                    error_text,
+                )
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        repository = AuditOnceRepository(
+            os.path.join(temporary.name, "events.db")
+        )
+        service, _detector, repository, _alarm, _clock, _directory = (
+            self.active_safety_service(repository=repository)
+        )
+        event_id = repository.list_events()[0]["id"]
+
+        with self.assertRaises(OSError):
+            service.record_alarm_delivery(
+                event_id,
+                "vision_alarm_on",
+                True,
+                "",
+            )
+        self.assertEqual(
+            service.get_status()["storage_error"],
+            "视觉事件存储不可用",
+        )
+
+        service.list_events()
+
+        self.assertTrue(repository.get_event(event_id)["alarm_on_delivered"])
+        self.assertEqual(service.get_status()["storage_error"], "")
 
     def test_list_events_delegates_limit_to_repository(self):
         service, _detector, repository, _alarm, _clock, _directory = (

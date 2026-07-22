@@ -177,6 +177,15 @@ class ZoneDetectorTests(unittest.TestCase):
         self.assertFalse(detector.acknowledge(99))
         self.assertEqual(detector.get_status()["state"], "alarm_active")
 
+    def test_current_alarm_can_be_silenced_without_a_persisted_event_id(self):
+        clock = FakeClock()
+        detector = armed_detector(clock)
+        start_alarm(detector, clock)
+
+        self.assertTrue(detector.acknowledge_current())
+        self.assertEqual(detector.get_status()["state"], "alarm_silenced")
+        self.assertIsNone(detector.get_status()["event_id"])
+
     def test_rebinding_a_different_event_id_keeps_original_event(self):
         clock = FakeClock()
         detector = armed_detector(clock)
