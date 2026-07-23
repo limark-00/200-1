@@ -1,95 +1,49 @@
-// =====================================================
-// LabSafetyMonitor
-// 前端主控制程序
-// =====================================================
+/*
+=================================================
+LabSafetyMonitor
 
+首页控制脚本
 
-// 刷新周期
+功能：
 
-const REFRESH_TIME = 5000;
+1. 获取环境数据
+2. 更新首页四个传感器卡片
+3. 更新数据表
+4. 安全判断
+5. 页面跳转
 
-
-
-// 安全阈值
-
-const LIMIT = {
-
-    temperature:30,
-
-    humidity:70,
-
-    gas:200,
-
-    light:1000
-
-};
+=================================================
+*/
 
 
 
-
-// =====================================================
-// 页面加载
-// =====================================================
-
-
-window.onload=function(){
+// =================================================
+// 页面跳转
+// =================================================
 
 
-    updateClock();
+function goPage(url){
 
 
-    setInterval(
-        updateClock,
-        1000
-    );
+    window.location.href=url;
 
 
-    loadEnvironment();
-
-
-    setInterval(
-        loadEnvironment,
-        REFRESH_TIME
-    );
-
-
-
-};
+}
 
 
 
 
-// =====================================================
-// 数字时钟
-// =====================================================
 
 
-function updateClock(){
+// =================================================
+// 打开个人信息
+// =================================================
 
 
-    let now=new Date();
+function openProfile(){
 
 
-    let time=
-        now.toLocaleTimeString(
-            "zh-CN",
-            {
-                hour12:false
-            }
-        );
-
-
-    let clock=
-        document.getElementById(
-            "clock"
-        );
-
-
-    if(clock){
-
-        clock.innerHTML=time;
-
-    }
+    window.location.href="/profile.html";
 
 
 }
@@ -100,229 +54,151 @@ function updateClock(){
 
 
 
-// =====================================================
+
+
+// =================================================
 // 获取环境数据
-// =====================================================
+// =================================================
 
 
-async function loadEnvironment(){
+async function getEnvironment(){
 
 
-try{
+
+    try{
 
 
-    let res=
-        await fetch(
+        let response = await fetch(
+
             "/api/env"
+
         );
 
 
-    let result=
-        await res.json();
 
+        let result = await response.json();
 
 
-    console.log(
-        result
-    );
 
 
+        if(result.ok){
 
-    if(
-        result.ok
-    ){
 
 
-        let data=result.data;
+            let data=result.data;
 
 
-        updateData(data);
 
 
 
-        onlineState(true);
 
+            // =========================
+            // 四个主页卡片
+            // =========================
 
 
-    }
-    else{
 
+            document.getElementById(
+                "temperature"
+            ).innerHTML=
+            data.temperature;
 
-        onlineState(false);
 
 
-    }
+            document.getElementById(
+                "humidity"
+            ).innerHTML=
+            data.humidity;
 
 
 
-}
-catch(e){
+            document.getElementById(
+                "gas"
+            ).innerHTML=
+            data.gas;
 
 
-    console.error(
-        e
-    );
 
+            document.getElementById(
+                "light"
+            ).innerHTML=
+            data.light;
 
-    onlineState(false);
 
 
 
-}
 
 
 
-}
+            // =========================
+            // 数据表
+            // =========================
 
 
+            document.getElementById(
+                "tableTemp"
+            ).innerHTML=
+            data.temperature+" ℃";
 
 
 
 
+            document.getElementById(
+                "tableHum"
+            ).innerHTML=
+            data.humidity+" %";
 
 
 
-// =====================================================
-// 更新页面数据
-// =====================================================
 
+            document.getElementById(
+                "tableGas"
+            ).innerHTML=
+            data.gas+" %LEL";
 
-function updateData(data){
 
 
 
-    // 温度
+            document.getElementById(
+                "tableLight"
+            ).innerHTML=
+            data.light+" Lux";
 
-    setText(
-        "temperatureValue",
-        data.temperature
-    );
 
 
 
-    // 湿度
 
-    setText(
-        "humidityValue",
-        data.humidity
-    );
 
 
 
-    // 气体
 
-    setText(
-        "gasValue",
-        data.gas
-    );
+            // =========================
+            // 安全判断
+            // =========================
 
 
+            checkSafety(data);
 
-    // 光照
 
-    setText(
-        "lightValue",
-        data.light
-    );
 
-
-
-
-
-
-    //设备信息
-
-
-    setText(
-        "deviceIdValue",
-        data.deviceId || "--"
-    );
-
-
-
-    setText(
-        "groupIdValue",
-        data.groupId || "--"
-    );
-
-
-
-    setText(
-        "refreshTimeValue",
-        new Date()
-        .toLocaleString()
-    );
-
-
-
-
-
-    // 保存风险判断
-
-
-    checkSafety(data);
-
-
-
-
-
-
-    // 原始数据
-
-
-    let raw=
-        document.getElementById(
-            "rawData"
-        );
-
-
-    if(raw){
-
-
-        raw.innerHTML=
-        JSON.stringify(
-            data,
-            null,
-            4
-        );
-
-    }
-
-
-
-
-}
-
-
-
-
-
-
-function setText(id,value){
-
-
-    let obj=
-        document.getElementById(id);
-
-
-    if(obj){
-
-        if(value===undefined||
-           value===null||
-           value===""){
-
-
-            obj.innerHTML="--";
-
-        }
-        else{
-
-
-            obj.innerHTML=value;
 
 
         }
 
+
+
+    }
+    catch(error){
+
+
+        console.log(
+
+            "环境数据获取失败:",
+            error
+
+        );
+
+
     }
 
 
@@ -336,281 +212,188 @@ function setText(id,value){
 
 
 
-
-// =====================================================
+// =================================================
 // 安全检测
-// =====================================================
+// =================================================
 
 
 function checkSafety(data){
 
 
 
-let level="正常";
-
-let reason="环境参数正常";
-
-
-
-let danger=false;
-
-let warning=false;
-
-
-
-// 温度
-
-
-if(
-Number(data.temperature)
->
-LIMIT.temperature
-){
-
-    warning=true;
-
-    reason=
-    "温度超过安全阈值";
-
-}
-
-
-
-
-
-// 湿度
-
-
-if(
-Number(data.humidity)
->
-LIMIT.humidity
-){
-
-    warning=true;
-
-    reason=
-    "湿度超过安全阈值";
-
-}
-
-
-
-
-
-// 气体
-
-
-if(
-Number(data.gas)
->
-LIMIT.gas
-){
-
-    danger=true;
-
-    reason=
-    "气体浓度超标";
-
-}
-
-
-
-
-
-
-// 光照
-
-
-if(
-Number(data.light)
->
-LIMIT.light
-){
-
-    warning=true;
-
-    reason=
-    "光照异常";
-
-}
-
-
-
-
-
-let badge=
-document.getElementById(
-"riskBadge"
-);
-
-
-
-let reasonBox=
-document.getElementById(
-"riskReason"
-);
-
-
-
-
-
-if(
-danger
-){
-
-
-    level="危险";
-
-
-    badge.className=
-    "risk-badge danger";
-
-
-}
-else if(
-warning
-){
-
-
-    level="预警";
-
-
-    badge.className=
-    "risk-badge warning";
-
-
-}
-else{
-
-
-    badge.className=
-    "risk-badge";
-
-
-}
-
-
-
-
-if(badge){
-
-    badge.innerHTML=
-    level;
-
-}
-
-
-
-if(reasonBox){
-
-    reasonBox.innerHTML=
-    reason;
-
-}
-
-
-
-
-
-// 卡片颜色
-
-
-changeCard(
-"temperatureCard",
-Number(data.temperature),
-LIMIT.temperature
-);
-
-
-changeCard(
-"humidityCard",
-Number(data.humidity),
-LIMIT.humidity
-);
-
-
-
-changeCard(
-"gasCard",
-Number(data.gas),
-LIMIT.gas
-);
-
-
-
-changeCard(
-"lightCard",
-Number(data.light),
-LIMIT.light
-);
-
-
-
-}
-
-
-
-
-
-
-
-
-
-// =====================================================
-// 卡片颜色变化
-// =====================================================
-
-
-function changeCard(
-id,
-value,
-limit
-){
-
-
-
-let card=
-document.getElementById(id);
-
-
-
-if(!card)
-return;
-
-
-
-card.classList.remove(
-"warning",
-"danger"
-);
-
-
-
-if(
-value>limit
-){
-
-
-    card.classList.add(
-        "danger"
+    let alarm=
+    document.getElementById(
+        "alarm"
     );
 
 
-}
 
-
-else if(
-value>limit*0.8
-){
-
-
-    card.classList.add(
-        "warning"
+    let score=
+    document.getElementById(
+        "score"
     );
 
 
-}
+
+
+    let danger=false;
+
+
+
+    let message=[];
+
+
+
+
+
+    // 温度
+
+
+    if(
+        data.temperature>28
+    ){
+
+
+        danger=true;
+
+
+        message.push(
+            "温度过高"
+        );
+
+
+    }
+
+
+
+
+
+
+    // 湿度
+
+
+    if(
+        data.humidity>70
+    ){
+
+
+        danger=true;
+
+
+        message.push(
+            "湿度异常"
+        );
+
+
+    }
+
+
+
+
+
+
+
+    // 气体
+
+
+    if(
+        data.gas>200
+    ){
+
+
+        danger=true;
+
+
+        message.push(
+            "气体浓度超标"
+        );
+
+
+    }
+
+
+
+
+
+
+
+    // 光照
+
+
+    if(
+        data.light>800
+    ){
+
+
+        danger=true;
+
+
+        message.push(
+            "光照异常"
+        );
+
+
+    }
+
+
+
+
+
+
+
+
+
+    if(danger){
+
+
+
+        alarm.innerHTML=
+
+
+        "⚠ "+message.join("、");
+
+
+
+        alarm.style.color=
+
+        "#dc2626";
+
+
+
+
+
+        score.innerHTML=
+
+        "70分";
+
+
+
+    }
+
+    else{
+
+
+
+        alarm.innerHTML=
+
+
+        "🟢 当前环境安全";
+
+
+
+        alarm.style.color=
+
+        "#16a34a";
+
+
+
+        score.innerHTML=
+
+        "100分";
+
+
+
+    }
 
 
 
@@ -625,301 +408,23 @@ value>limit*0.8
 
 
 
-// =====================================================
-// 巴法云状态
-// =====================================================
+
+// =================================================
+// 自动刷新
+// =================================================
 
 
-function onlineState(state){
+getEnvironment();
 
 
 
-let dot=
-document.getElementById(
-"stateDot"
+setInterval(
+
+
+    getEnvironment,
+
+
+    2000
+
+
 );
-
-
-
-let text=
-document.getElementById(
-"cloudStateText"
-);
-
-
-
-let connect=
-document.getElementById(
-"connectionValue"
-);
-
-
-
-if(state){
-
-
-
-dot.className=
-"state-dot online";
-
-
-text.innerHTML=
-"巴法云在线";
-
-
-if(connect)
-
-connect.innerHTML=
-"在线";
-
-
-
-}
-else{
-
-
-dot.className=
-"state-dot offline";
-
-
-text.innerHTML=
-"连接失败";
-
-
-if(connect)
-
-connect.innerHTML=
-"离线";
-
-
-}
-
-
-
-}
-
-
-
-
-
-
-
-
-
-// =====================================================
-// 点击传感器进入分析页面
-// =====================================================
-
-
-function openChart(type){
-
-
-
-window.location.href=
-"/chart.html?type="
-+
-type;
-
-
-
-}
-
-
-
-
-
-
-
-
-
-// =====================================================
-// 手动刷新按钮
-// =====================================================
-
-
-let refresh=
-document.getElementById(
-"refreshButton"
-);
-
-
-
-if(refresh){
-
-
-refresh.onclick=function(){
-
-
-    loadEnvironment();
-
-
-};
-
-
-}
-
-
-
-
-
-
-
-
-
-// =====================================================
-// 发送控制命令
-// =====================================================
-
-
-let sendBtn=
-document.getElementById(
-"sendButton"
-);
-
-
-
-if(sendBtn){
-
-
-sendBtn.onclick=
-function(){
-
-
-let msg=
-document.getElementById(
-"messageInput"
-).value;
-
-
-
-sendMessage(msg);
-
-
-
-};
-
-
-}
-
-
-
-
-
-
-
-
-// 快捷按钮
-
-
-document
-.querySelectorAll(
-".quick-button"
-)
-.forEach(
-btn=>{
-
-
-btn.onclick=function(){
-
-
-sendMessage(
-btn.dataset.message
-);
-
-
-};
-
-
-});
-
-
-
-
-
-
-
-
-
-async function sendMessage(msg){
-
-
-
-if(!msg)
-return;
-
-
-
-try{
-
-
-let res=
-await fetch(
-"/api/env/send",
-{
-
-
-method:"POST",
-
-
-headers:{
-
-
-"Content-Type":
-"application/json"
-
-
-},
-
-
-body:
-JSON.stringify(
-{
-msg:msg
-}
-)
-
-
-}
-);
-
-
-
-let result=
-await res.json();
-
-
-
-document
-.getElementById(
-"sendStatus"
-)
-.innerHTML=
-"发送成功:"+msg;
-
-
-
-console.log(
-result
-);
-
-
-
-}
-
-catch(e){
-
-
-
-document
-.getElementById(
-"sendStatus"
-)
-.innerHTML=
-"发送失败";
-
-
-}
-
-
-
-}

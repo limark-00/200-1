@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+
+<title>
+摄像头管理
+</title>
+
+
+<link rel="stylesheet" href="/static/style.css">
+
+
+</head>
+
+
+
+<body>
+
+
+
+<!-- 顶部 -->
+
+<header class="header">
+
+
+<h1>
+📷 实验室智能摄像头管理
+</h1>
+
+
+<div id="clock">
+
+--:--:--
+
+</div>
+
+
+</header>
+
+
+
+
+
+
+
+
+
+<div class="container">
+
+
+
+
+
+<!-- 返回 -->
+
+<div class="back-box">
+
+
+<button onclick="goHome()">
+
+
+⬅ 返回首页
+
+
+</button>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<section class="camera-layout">
+
+
+
+
+
+
+<!-- =====================
+左侧视频
+===================== -->
+
+
+<div class="camera-panel">
+
+
+
+<div class="panel-title">
+
+🎥 实时监控画面
+
+</div>
+
+
+
+
+
+<div class="camera-view">
+
+
+<img
+
+src="/camera"
+
+id="cameraStream"
+
+
+>
+
+
+
+</div>
+
+
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<!-- =====================
+右侧信息
+===================== -->
+
+
+<div class="camera-info">
+
+
+
+
+
+<div class="info-card">
+
+
+<div class="info-title">
+
+👥 当前人数
+
+</div>
+
+
+
+<div class="info-value"
+
+id="people">
+
+
+0 人
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="info-card">
+
+
+<div class="info-title">
+
+⚡ 实时FPS
+
+</div>
+
+
+
+<div class="info-value"
+
+id="fps">
+
+
+0
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="info-card">
+
+
+<div class="info-title">
+
+📡 摄像头状态
+
+</div>
+
+
+
+<div class="info-value safe"
+
+id="cameraStatus">
+
+
+检测中
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+
+<div class="info-card">
+
+
+<div class="info-title">
+
+🛡 环境安全
+
+</div>
+
+
+
+<div class="info-value safe"
+
+id="safe">
+
+
+安全
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+</div>
+
+
+
+
+
+</section>
+
+
+
+
+
+
+
+
+
+<!-- =====================
+AI信息表
+===================== -->
+
+
+<section class="panel">
+
+
+<div class="panel-title">
+
+🤖 AI智能检测信息
+
+</div>
+
+
+
+
+
+<table>
+
+
+<tr>
+
+<th>
+项目
+</th>
+
+
+<th>
+数据
+</th>
+
+</tr>
+
+
+
+
+
+<tr>
+
+<td>
+摄像头编号
+</td>
+
+
+<td id="cameraIndex">
+
+--
+
+</td>
+
+
+</tr>
+
+
+
+
+
+<tr>
+
+<td>
+检测目标
+</td>
+
+
+<td>
+person
+</td>
+
+
+</tr>
+
+
+
+
+
+
+<tr>
+
+<td>
+检测算法
+</td>
+
+
+<td>
+YOLOv8
+</td>
+
+
+</tr>
+
+
+
+
+
+<tr>
+
+<td>
+人数阈值
+</td>
+
+
+<td>
+20 人
+</td>
+
+
+</tr>
+
+
+
+
+
+<tr>
+
+<td>
+更新时间
+</td>
+
+
+<td id="updateTime">
+
+--
+
+</td>
+
+
+</tr>
+
+
+
+
+
+</table>
+
+
+</section>
+
+
+
+
+
+
+
+
+
+<!-- 环境状态 -->
+
+<section class="panel">
+
+
+<div class="panel-title">
+
+🌡 环境安全检测
+
+</div>
+
+
+
+<table>
+
+
+<tr>
+
+<th>
+参数
+</th>
+
+
+<th>
+当前值
+</th>
+
+
+<th>
+状态
+</th>
+
+
+</tr>
+
+
+
+<tr>
+
+<td>
+温度
+</td>
+
+
+<td id="temperature">
+
+--
+
+</td>
+
+
+<td id="tempState">
+
+--
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+湿度
+</td>
+
+
+<td id="humidity">
+
+--
+
+</td>
+
+
+<td id="humidityState">
+
+--
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+气体浓度
+</td>
+
+
+<td id="gas">
+
+--
+
+</td>
+
+
+<td id="gasState">
+
+--
+
+</td>
+
+
+</tr>
+
+
+
+
+<tr>
+
+<td>
+光照
+</td>
+
+
+<td id="light">
+
+--
+
+</td>
+
+
+<td id="lightState">
+
+--
+
+</td>
+
+
+</tr>
+
+
+
+</table>
+
+
+
+</section>
+
+
+
+
+
+
+
+
+
+<script src="/static/camera.js"></script>
+
+
+
+</body>
+
+
+</html>

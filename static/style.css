@@ -1,7 +1,7 @@
-/* ==================================================
-   LabSafetyMonitor
-   实验室安全检测平台样式
-================================================== */
+/* =================================================
+LabSafetyMonitor
+全局样式
+================================================= */
 
 
 *{
@@ -12,36 +12,22 @@
 
     box-sizing:border-box;
 
+    font-family:
+    "Microsoft YaHei",
+    Arial,
+    sans-serif;
+
 }
+
 
 
 body{
 
 
-    font-family:
-
-    "Microsoft YaHei",
-    Arial,
-    sans-serif;
+    background:#f1f5f9;
 
 
-    background:
-
-    linear-gradient(
-
-        135deg,
-
-        #06192f,
-
-        #092b52
-
-    );
-
-
-    color:white;
-
-
-    min-height:100vh;
+    color:#333;
 
 
 }
@@ -50,15 +36,18 @@ body{
 
 
 
-/* ==================================================
+/* =================================================
 顶部标题栏
-================================================== */
+================================================= */
 
 
-.header{
+.top-header{
 
 
-    height:80px;
+    height:70px;
+
+
+    background:white;
 
 
     display:flex;
@@ -73,39 +62,8 @@ body{
     padding:0 35px;
 
 
-
-    background:
-
-    rgba(0,40,80,0.85);
-
-
-
-    border-bottom:
-
-    1px solid rgba(0,200,255,0.4);
-
-
-
     box-shadow:
-
-    0 0 20px rgba(0,200,255,.3);
-
-
-}
-
-
-
-
-.header h1{
-
-
-    font-size:30px;
-
-
-    color:#00eaff;
-
-
-    letter-spacing:3px;
+    0 2px 10px rgba(0,0,0,.08);
 
 
 }
@@ -113,13 +71,13 @@ body{
 
 
 
-.header .time{
+.top-header h1{
 
 
-    font-size:22px;
+    font-size:26px;
 
 
-    color:#fff;
+    color:#1e3a8a;
 
 
 }
@@ -130,102 +88,33 @@ body{
 
 
 
+/* =================================================
+右上角用户
+================================================= */
 
 
-/* ==================================================
-主容器
-================================================== */
+.user-box{
 
 
-.container{
+    display:flex;
 
 
-    width:95%;
+    align-items:center;
 
 
-    margin:25px auto;
+    gap:12px;
 
 
+    padding:8px 18px;
 
-}
 
-
-
-
-
-
-
-
-
-/* ==================================================
-数据卡片区域
-================================================== */
-
-
-.card-box{
-
-
-    display:grid;
-
-
-    grid-template-columns:
-
-    repeat(4,1fr);
-
-
-
-    gap:20px;
-
-
-}
-
-
-
-
-
-.card{
-
-
-    height:180px;
-
-
-    background:
-
-
-    rgba(255,255,255,0.08);
-
-
-
-    border-radius:18px;
-
-
-
-    padding:25px;
-
-
-
-    position:relative;
-
-
-
-    overflow:hidden;
-
-
-
-    border:
-
-    1px solid rgba(0,220,255,.3);
-
-
-
-    box-shadow:
-
-    0 0 20px rgba(0,200,255,.15);
-
+    border-radius:12px;
 
 
     cursor:pointer;
 
+
+    background:#f8fafc;
 
 
     transition:.3s;
@@ -235,18 +124,10 @@ body{
 
 
 
-.card:hover{
+.user-box:hover{
 
 
-    transform:
-
-    translateY(-8px);
-
-
-
-    box-shadow:
-
-    0 0 35px rgba(0,220,255,.5);
+    background:#dbeafe;
 
 
 }
@@ -254,10 +135,757 @@ body{
 
 
 
-.card-title{
+
+.user-box img{
 
 
-    color:#9edcff;
+    width:42px;
+
+
+    height:42px;
+
+
+    border-radius:50%;
+
+
+    border:2px solid #2563eb;
+
+
+}
+
+
+
+.user-box span{
+
+
+    font-size:16px;
+
+
+    font-weight:bold;
+
+
+}
+
+
+
+
+
+
+
+
+
+/* =================================================
+整体布局
+================================================= */
+
+
+.layout{
+
+
+    display:flex;
+
+
+    min-height:calc(100vh - 70px);
+
+
+}
+
+
+
+
+
+
+
+
+/* =================================================
+左侧菜单
+================================================= */
+
+
+.sidebar{
+
+
+    width:240px;
+
+
+    background:#2563eb;
+
+
+    padding:25px 15px;
+
+
+}
+
+
+
+
+
+
+.menu-title{
+
+
+    color:white;
+
+
+    font-size:24px;
+
+
+    font-weight:bold;
+
+
+    text-align:center;
+
+
+    margin-bottom:25px;
+
+
+}
+
+
+
+
+
+
+
+
+/* 一级按钮 */
+
+
+.menu-item{
+
+
+    background:#3b82f6;
+
+
+    color:white;
+
+
+    padding:15px;
+
+
+    margin-bottom:15px;
+
+
+    border-radius:12px;
+
+
+    cursor:pointer;
+
+
+    font-size:16px;
+
+
+    transition:.3s;
+
+
+}
+
+
+
+
+.menu-item:hover{
+
+
+    background:#1d4ed8;
+
+
+    transform:translateX(5px);
+
+
+}
+
+
+
+
+
+.menu-item.active{
+
+
+    background:white;
+
+
+    color:#2563eb;
+
+
+    font-weight:bold;
+
+
+}
+
+
+
+
+
+
+
+
+/* 分组 */
+
+
+.menu-group{
+
+
+    margin-bottom:15px;
+
+
+}
+
+
+
+
+
+
+.group-title{
+
+
+    color:white;
+
+
+    padding:14px;
+
+
+    background:#1e40af;
+
+
+    border-radius:12px;
+
+
+    font-size:16px;
+
+
+    margin-bottom:8px;
+
+
+}
+
+
+
+
+
+
+/* 子菜单 */
+
+
+.submenu{
+
+
+    background:#60a5fa;
+
+
+    color:white;
+
+
+    margin:8px 0;
+
+
+    padding:12px;
+
+
+    border-radius:10px;
+
+
+    cursor:pointer;
+
+
+    transition:.3s;
+
+
+    font-size:15px;
+
+
+}
+
+
+
+
+
+.submenu:hover{
+
+
+    background:#1d4ed8;
+
+
+    transform:translateX(5px);
+
+
+}
+
+
+
+
+
+
+
+
+
+
+/* =================================================
+主体区域
+================================================= */
+
+
+.main-content{
+
+
+    flex:1;
+
+
+    padding:30px;
+
+
+}
+
+
+
+
+
+
+
+/* 首页欢迎卡 */
+
+
+.welcome-card{
+
+
+    background:white;
+
+
+    padding:25px;
+
+
+    border-radius:18px;
+
+
+    margin-bottom:25px;
+
+
+    box-shadow:
+    0 4px 15px rgba(0,0,0,.08);
+
+
+}
+
+
+
+.welcome-card h2{
+
+
+    color:#1e3a8a;
+
+
+    margin-bottom:10px;
+
+
+}
+
+
+
+
+
+
+
+
+
+/* =================================================
+四个传感器卡片
+================================================= */
+
+
+.sensor-row{
+
+
+    display:grid;
+
+
+    grid-template-columns:
+    repeat(4,1fr);
+
+
+    gap:20px;
+
+
+    margin-bottom:25px;
+
+
+}
+
+
+
+
+
+
+.sensor-card{
+
+
+    background:white;
+
+
+    padding:25px;
+
+
+    border-radius:18px;
+
+
+    text-align:center;
+
+
+    box-shadow:
+    0 4px 15px rgba(0,0,0,.08);
+
+
+    transition:.3s;
+
+
+}
+
+
+
+.sensor-card:hover{
+
+
+    transform:translateY(-5px);
+
+
+}
+
+
+
+
+
+
+.sensor-card h3{
+
+
+    margin-bottom:15px;
+
+
+    font-size:20px;
+
+
+}
+
+
+
+
+
+
+.sensor-value{
+
+
+    font-size:35px;
+
+
+    font-weight:bold;
+
+
+    color:#2563eb;
+
+
+}
+
+
+
+
+
+
+
+/* 不同颜色 */
+
+
+.temperature .sensor-value{
+
+
+    color:#ef4444;
+
+
+}
+
+
+.humidity .sensor-value{
+
+
+    color:#0ea5e9;
+
+
+}
+
+
+.gas .sensor-value{
+
+
+    color:#f97316;
+
+
+}
+
+
+.light .sensor-value{
+
+
+    color:#eab308;
+
+
+}
+
+
+
+
+
+
+
+
+/* =================================================
+统计区域
+================================================= */
+
+
+.dashboard-row{
+
+
+    display:grid;
+
+
+    grid-template-columns:
+    repeat(3,1fr);
+
+
+    gap:20px;
+
+
+    margin-bottom:25px;
+
+
+}
+
+
+
+
+
+.info-panel{
+
+
+    background:white;
+
+
+    padding:25px;
+
+
+    border-radius:18px;
+
+
+    text-align:center;
+
+
+    box-shadow:
+    0 4px 15px rgba(0,0,0,.08);
+
+
+}
+
+
+
+.info-panel h3{
+
+
+    margin-bottom:15px;
+
+
+    color:#1e40af;
+
+
+}
+
+
+
+
+
+
+
+
+
+/* =================================================
+表格
+================================================= */
+
+
+.table-card{
+
+
+    background:white;
+
+
+    padding:25px;
+
+
+    border-radius:18px;
+
+
+    box-shadow:
+    0 4px 15px rgba(0,0,0,.08);
+
+
+}
+
+
+
+
+
+table{
+
+
+    width:100%;
+
+
+    border-collapse:collapse;
+
+
+    margin-top:20px;
+
+
+}
+
+
+
+th{
+
+
+    background:#2563eb;
+
+
+    color:white;
+
+
+    padding:12px;
+
+
+}
+
+
+
+td{
+
+
+    text-align:center;
+
+
+    padding:12px;
+
+
+    border-bottom:1px solid #ddd;
+
+
+}
+
+
+
+
+
+
+
+/* =================================================
+分析页面
+================================================= */
+
+
+.container{
+
+
+    padding:25px;
+
+
+}
+
+
+
+
+.back-box button{
+
+
+    background:#2563eb;
+
+
+    color:white;
+
+
+    border:none;
+
+
+    padding:12px 25px;
+
+
+    border-radius:12px;
+
+
+    cursor:pointer;
+
+
+    margin-bottom:20px;
+
+
+}
+
+
+
+
+.analysis-card{
+
+
+    background:white;
+
+
+    padding:30px;
+
+
+    border-radius:18px;
+
+
+    box-shadow:
+    0 4px 15px rgba(0,0,0,.08);
+
+
+}
+
+
+
+
+
+
+.data-box{
+
+
+    display:grid;
+
+
+    grid-template-columns:
+    repeat(4,1fr);
+
+
+    gap:20px;
+
+
+    margin:25px 0;
+
+
+}
+
+
+
+
+
+
+.data-box div{
+
+
+    background:#f8fafc;
+
+
+    padding:20px;
+
+
+    border-radius:15px;
+
+
+    text-align:center;
 
 
     font-size:18px;
@@ -269,68 +897,35 @@ body{
 
 
 
-.card-value{
+#current,
+#max,
+#min{
 
 
-    margin-top:25px;
+    font-size:30px;
 
 
-
-    font-size:50px;
-
+    color:#2563eb;
 
 
     font-weight:bold;
 
 
-
-    color:#fff;
-
-
-
-}
-
-
-
-
-.card-unit{
-
-
-    font-size:20px;
-
-
-
-    color:#00eaff;
-
-
 }
 
 
 
 
 
-
-
-
-
-/* ==================================================
-状态颜色
-================================================== */
 
 
 .safe{
 
 
-    color:#00ff9d!important;
+    color:#16a34a;
 
 
-}
-
-
-.warning{
-
-
-    color:#ffd000!important;
+    font-weight:bold;
 
 
 }
@@ -339,189 +934,7 @@ body{
 .danger{
 
 
-    color:#ff3b3b!important;
-
-
-}
-
-
-
-
-
-
-
-
-
-
-
-/* ==================================================
-下面布局
-================================================== */
-
-
-.main-grid{
-
-
-    margin-top:25px;
-
-
-
-    display:grid;
-
-
-
-    grid-template-columns:
-
-    2fr 1fr;
-
-
-
-    gap:20px;
-
-
-}
-
-
-
-
-
-.panel{
-
-
-    background:
-
-    rgba(255,255,255,.08);
-
-
-
-    border-radius:18px;
-
-
-
-    padding:25px;
-
-
-
-    border:
-
-    1px solid rgba(0,200,255,.25);
-
-
-
-    box-shadow:
-
-    0 0 20px rgba(0,200,255,.15);
-
-
-}
-
-
-
-.panel-title{
-
-
-    font-size:22px;
-
-
-    color:#00eaff;
-
-
-    margin-bottom:20px;
-
-
-}
-
-
-
-
-
-
-
-
-
-/* ==================================================
-摄像头
-================================================== */
-
-
-.camera{
-
-
-    width:100%;
-
-
-
-    border-radius:15px;
-
-
-
-    overflow:hidden;
-
-
-
-    border:
-
-    2px solid #00d9ff;
-
-
-
-}
-
-
-
-.camera img{
-
-
-    width:100%;
-
-
-    display:block;
-
-
-}
-
-
-
-
-
-
-
-
-
-
-/* ==================================================
-报警区域
-================================================== */
-
-
-.alarm{
-
-
-    padding:15px;
-
-
-
-    border-radius:10px;
-
-
-
-    background:
-
-    rgba(255,255,255,.05);
-
-
-
-    margin-top:10px;
-
-
-}
-
-
-
-.alarm span{
-
-
-    font-size:24px;
+    color:#dc2626;
 
 
     font-weight:bold;
@@ -537,196 +950,39 @@ body{
 
 
 
-
-/* ==================================================
-按钮
-================================================== */
-
-
-button{
+/* =================================================
+摄像头页面兼容
+================================================= */
 
 
-    background:
-
-    #009ee8;
+.camera-layout{
 
 
-
-    color:white;
-
+    display:flex;
 
 
-    border:none;
-
-
-
-    padding:
-
-    12px 25px;
-
-
-
-    border-radius:8px;
-
-
-
-    cursor:pointer;
-
-
-
-    font-size:16px;
-
+    gap:25px;
 
 
 }
 
 
 
-button:hover{
+.camera-panel,
+.camera-info{
 
 
-    background:#00c8ff;
+    background:white;
 
 
-}
-
-
-
-
-
-
-
-
-
-
-/* ==================================================
-输入框
-================================================== */
-
-
-input{
-
-
-    background:
-
-    rgba(255,255,255,.1);
-
-
-
-    border:
-
-    1px solid #00c8ff;
-
-
-
-    color:white;
-
-
-
-    padding:12px;
-
-
-
-    border-radius:8px;
-
-
-
-}
-
-
-
-
-
-
-
-
-
-
-/* ==================================================
-折线图
-================================================== */
-
-
-.chart-box{
-
-
-    width:100%;
-
-
-
-    height:420px;
-
-
-
-    background:
-
-
-    rgba(255,255,255,.06);
-
-
-
-    border-radius:15px;
-
+    border-radius:18px;
 
 
     padding:20px;
 
 
-
-}
-
-
-
-
-
-
-
-
-
-
-/* ==================================================
-数据表
-================================================== */
-
-
-table{
-
-
-    width:100%;
-
-
-
-    border-collapse:collapse;
-
-
-}
-
-
-
-th{
-
-
-    color:#00eaff;
-
-
-}
-
-
-
-td,th{
-
-
-    padding:12px;
-
-
-
-    text-align:center;
-
-
-
-    border-bottom:
-
-    1px solid rgba(255,255,255,.1);
+    box-shadow:
+    0 4px 15px rgba(0,0,0,.08);
 
 
 }
@@ -738,83 +994,19 @@ td,th{
 
 
 
-
-/* ==================================================
-滚动报警提示
-================================================== */
-
-
-.notice{
-
-
-    margin-top:20px;
-
-
-
-    padding:15px;
-
-
-
-    background:
-
-    rgba(255,0,0,.15);
-
-
-
-    border-radius:10px;
-
-
-
-    color:#ff5555;
-
-
-
-    animation:
-
-    flash 1.5s infinite;
-
-
-}
-
-
-
-
-@keyframes flash{
-
-
-    50%{
-
-
-        opacity:.5;
-
-
-    }
-
-
-}
-
-
-
-
-
-
-
-
-
-
-/* ==================================================
+/* =================================================
 响应式
-================================================== */
+================================================= */
 
 
-@media(max-width:1200px){
+@media(max-width:1100px){
 
 
-.card-box{
+
+.sensor-row{
 
 
 grid-template-columns:
-
 repeat(2,1fr);
 
 
@@ -822,37 +1014,20 @@ repeat(2,1fr);
 
 
 
-.main-grid{
+.data-box{
 
 
-grid-template-columns:1fr;
-
-
-}
-
+grid-template-columns:
+repeat(2,1fr);
 
 
 }
 
 
-
-@media(max-width:700px){
-
-
-.card-box{
+.sidebar{
 
 
-grid-template-columns:1fr;
-
-
-}
-
-
-
-.header h1{
-
-
-font-size:20px;
+width:200px;
 
 
 }

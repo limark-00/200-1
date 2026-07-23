@@ -3,99 +3,262 @@
 """
 camera_stream.py
 
-实验室安全监测系统实时摄像头
+LabSafetyMonitor 摄像头模块
 
-功能：
-1. 支持USB外接摄像头
-2. 自动检测摄像头编号
-3. 优先使用config.py配置
-4. 输出MJPEG视频流给FastAPI
+功能:
+
+1. 自动寻找摄像头
+2. USB摄像头优先
+3. MJPEG视频流
+4. YOLOv8实时检测
+5. 人员检测
+6. 人数统计
+7. FPS显示
+8. 提供摄像头状态接口
+
+
+说明:
+
+YOLO模型唯一加载位置
+
 """
 
 
 import cv2
+
 import time
-import config
+
+import threading
 
 
 
-# ================================
-# 摄像头对象
-# ================================
+# ==================================================
+# 人数同步模块
+# ==================================================
 
-camera = None
+import yolo_detect
 
 
 
-# ================================
-# 摄像头编号
-# ================================
+
+
+
+
+# ==================================================
+# YOLO模型
+# ==================================================
+
+
+try:
+
+
+    from ultralytics import YOLO
+
+
+
+    yolo_model = YOLO(
+
+        "yolov8n.pt"
+
+    )
+
+
+
+    print(
+
+        "YOLO模型加载成功"
+
+    )
+
+
+
+except Exception as e:
+
+
+
+    print(
+
+        "YOLO加载失败:",
+
+        e
+
+    )
+
+
+
+    yolo_model=None
+
+
+
+
+
+
+
+# ==================================================
+# 摄像头列表
+# ==================================================
+
+
+CAMERA_LIST=[
+
+
+    1,      # USB摄像头优先
+
+
+    0,      # 内置摄像头
+
+
+    2,
+
+
+    3
+
+
+]
+
+
+
+
+
+
+
+
+# ==================================================
+# 全局变量
+# ==================================================
+
+
+camera=None
+
+
+
+camera_index=None
+
+
+
+camera_lock=threading.Lock()
+
+
+
+
+
+# 人数
+
+people_count=0
+
+
+
+# FPS
+
+fps=0
+
+
+
+
+
+
+
+
+
+
+# ==================================================
+# 查找摄像头
+# ==================================================
 
 
 def find_camera():
 
-    """
-    自动寻找可用摄像头
 
-    优先:
-    config.CAMERA_INDEX
-
-    """
-
-    index_list = [
-
-        config.CAMERA_INDEX,
-
-        0,
-        1,
-        2,
-        3
-
-    ]
+    global camera_index
 
 
-    checked=[]
+
+    print(
+
+        "正在检测摄像头..."
+
+    )
 
 
-    for index in index_list:
+
+    for index in CAMERA_LIST:
 
 
-        if index in checked:
 
-            continue
-
-
-        checked.append(index)
+        try:
 
 
-        cap=cv2.VideoCapture(
 
-            index,
-
-            cv2.CAP_DSHOW
-
-        )
+            cap=cv2.VideoCapture(
 
 
-        if cap.isOpened():
+                index,
 
 
-            print(
+                cv2.CAP_DSHOW
 
-                "找到摄像头:",
-                index
 
             )
+
+
+
+            time.sleep(0.5)
+
+
+
+
+
+            if cap.isOpened():
+
+
+
+                ret,frame=cap.read()
+
+
+
+                if ret:
+
+
+
+                    camera_index=index
+
+
+
+                    print(
+
+                        "摄像头连接成功:",
+
+                        index
+
+                    )
+
+
+
+                    return cap
+
+
+
 
 
             cap.release()
 
 
-            return index
+
+        except Exception as e:
 
 
 
-        cap.release()
+            print(
+
+                "摄像头检测失败:",
+
+                e
+
+            )
+
+
+
+
 
 
 
@@ -106,7 +269,8 @@ def find_camera():
     )
 
 
-    return -1
+
+    return None
 
 
 
@@ -114,9 +278,14 @@ def find_camera():
 
 
 
-# ================================
-# 初始化摄像头
-# ================================
+
+
+
+
+
+# ==================================================
+# 获取摄像头
+# ==================================================
 
 
 def get_camera():
@@ -126,81 +295,295 @@ def get_camera():
 
 
 
-    if camera is None:
-
-
-        index=find_camera()
+    with camera_lock:
 
 
 
-        if index==-1:
-
-
-            return None
+        if camera is None:
 
 
 
-        camera=cv2.VideoCapture(
+            camera=find_camera()
 
-            index,
 
-            cv2.CAP_DSHOW
+
+        return camera
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================
+# 释放摄像头
+# ==================================================
+
+
+def release_camera():
+
+
+    global camera
+
+
+
+    with camera_lock:
+
+
+
+        if camera:
+
+
+
+            camera.release()
+
+
+
+        camera=None
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================
+# YOLO检测
+# ==================================================
+
+
+def detect(frame):
+
+
+    global people_count
+
+
+
+    if yolo_model is None:
+
+
+
+        return frame
+
+
+
+
+
+    try:
+
+
+
+        results=yolo_model(
+
+
+            frame,
+
+
+            verbose=False
+
 
         )
 
 
 
-        # 设置分辨率
+        count=0
 
 
-        camera.set(
 
-            cv2.CAP_PROP_FRAME_WIDTH,
 
-            getattr(
 
-                config,
+        for r in results:
 
-                "CAMERA_WIDTH",
 
-                1280
+
+            boxes=r.boxes
+
+
+
+
+
+            for box in boxes:
+
+
+
+                cls=int(
+
+                    box.cls[0]
+
+                )
+
+
+
+                conf=float(
+
+                    box.conf[0]
+
+                )
+
+
+
+
+
+                # COCO类别0 = person
+
+
+                if cls==0 and conf>0.5:
+
+
+
+                    count+=1
+
+
+
+
+
+                    x1,y1,x2,y2=map(
+
+
+                        int,
+
+
+                        box.xyxy[0]
+
+
+                    )
+
+
+
+
+
+
+                    # 绘制框
+
+
+                    cv2.rectangle(
+
+
+                        frame,
+
+
+                        (x1,y1),
+
+
+                        (x2,y2),
+
+
+                        (0,255,0),
+
+
+                        2
+
+
+                    )
+
+
+
+
+
+
+                    cv2.putText(
+
+
+                        frame,
+
+
+                        "person",
+
+
+                        (x1,y1-10),
+
+
+                        cv2.FONT_HERSHEY_SIMPLEX,
+
+
+                        0.7,
+
+
+                        (0,255,0),
+
+
+                        2
+
+
+                    )
+
+
+
+
+
+
+
+        people_count=count
+
+
+
+
+
+        # ===========================
+        # 同步给 yolo_detect
+        # ===========================
+
+
+        try:
+
+
+
+            yolo_detect.set_people(
+
+
+                count
+
 
             )
 
-        )
 
 
-        camera.set(
+        except Exception as e:
 
-            cv2.CAP_PROP_FRAME_HEIGHT,
 
-            getattr(
 
-                config,
+            print(
 
-                "CAMERA_HEIGHT",
+                "人数同步失败:",
 
-                720
+                e
 
             )
 
+
+
+
+
+
+
+    except Exception as e:
+
+
+
+        print(
+
+            "YOLO检测错误:",
+
+            e
+
         )
 
 
 
-        # FPS
-
-        camera.set(
-
-            cv2.CAP_PROP_FPS,
-
-            30
-
-        )
 
 
 
-    return camera
+    return frame
 
 
 
@@ -208,29 +591,25 @@ def get_camera():
 
 
 
-# ================================
+
+
+
+
+# ==================================================
 # MJPEG视频流
-# ================================
+# ==================================================
 
 
 def generate_frames():
 
 
-    cap=get_camera()
+    global fps
 
 
 
-    if cap is None:
+    last=time.time()
 
 
-        print(
-
-            "摄像头初始化失败"
-
-        )
-
-
-        return
 
 
 
@@ -238,20 +617,21 @@ def generate_frames():
 
 
 
-        if not cap.isOpened():
+
+        cap=get_camera()
 
 
-            print(
-
-                "摄像头断开"
-
-            )
 
 
-            time.sleep(2)
+        if cap is None:
 
 
-            break
+
+            time.sleep(3)
+
+
+            continue
+
 
 
 
@@ -261,10 +641,20 @@ def generate_frames():
 
 
 
+
         if not success:
 
 
-            time.sleep(0.05)
+
+            print(
+
+                "读取失败"
+
+            )
+
+
+            release_camera()
+
 
             continue
 
@@ -272,37 +662,172 @@ def generate_frames():
 
 
 
-        # 镜像显示
+
+
+
+        # 镜像
+
 
         frame=cv2.flip(
 
+
             frame,
 
+
             1
+
 
         )
 
 
 
 
-        # JPEG编码
+
+
+        # YOLO检测
+
+
+        frame=detect(
+
+
+            frame
+
+
+        )
+
+
+
+
+
+
+        # FPS
+
+
+        now=time.time()
+
+
+
+        if now-last!=0:
+
+
+
+            fps=int(
+
+
+                1/(now-last)
+
+
+            )
+
+
+
+        last=now
+
+
+
+
+
+
+
+        # 左上角显示
+
+
+        cv2.putText(
+
+
+            frame,
+
+
+            f"People:{people_count}",
+
+
+            (20,40),
+
+
+            cv2.FONT_HERSHEY_SIMPLEX,
+
+
+            1,
+
+
+            (255,0,0),
+
+
+            2
+
+
+        )
+
+
+
+
+
+
+
+        cv2.putText(
+
+
+            frame,
+
+
+            f"FPS:{fps}",
+
+
+            (20,80),
+
+
+            cv2.FONT_HERSHEY_SIMPLEX,
+
+
+            1,
+
+
+            (255,0,0),
+
+
+            2
+
+
+        )
+
+
+
+
+
+
+
+        # 调整大小
+
+
+        frame=cv2.resize(
+
+
+            frame,
+
+
+            (1280,720)
+
+
+        )
+
+
+
+
+
+
 
 
         ret,buffer=cv2.imencode(
 
+
             ".jpg",
 
-            frame,
 
-            [
+            frame
 
-                cv2.IMWRITE_JPEG_QUALITY,
-
-                80
-
-            ]
 
         )
+
 
 
 
@@ -315,11 +840,17 @@ def generate_frames():
 
 
 
-        frame_bytes=buffer.tobytes()
+
+
+        jpg=buffer.tobytes()
+
+
+
 
 
 
         yield (
+
 
 
             b"--frame\r\n"
@@ -328,12 +859,8 @@ def generate_frames():
             b"Content-Type: image/jpeg\r\n\r\n"
 
 
-            +
+            + jpg +
 
-            frame_bytes
-
-
-            +
 
             b"\r\n"
 
@@ -345,24 +872,80 @@ def generate_frames():
 
 
 
-
-
-# ================================
-# 释放摄像头
-# ================================
-
-
-def release_camera():
-
-
-    global camera
+        time.sleep(0.03)
 
 
 
-    if camera:
 
 
-        camera.release()
 
 
-        camera=None
+
+
+
+
+
+
+# ==================================================
+# 摄像头状态接口
+# app.py调用
+# ==================================================
+
+
+def get_camera_info():
+
+
+    return {
+
+
+
+        "connected":
+
+        camera is not None,
+
+
+
+        "index":
+
+        camera_index,
+
+
+
+        "people":
+
+        people_count,
+
+
+
+        "fps":
+
+        fps
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ==================================================
+# 测试
+# ==================================================
+
+
+if __name__=="__main__":
+
+
+
+    for frame in generate_frames():
+
+
+        pass

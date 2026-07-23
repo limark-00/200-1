@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+
+<title>
+湿度检测
+</title>
+
+
+<link rel="stylesheet" href="/static/style.css">
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+</head>
+
+
+
+<body
+
+data-type="humidity"
+
+data-limit="70"
+
+>
+
+
+
+<header class="header">
+
+<h1>
+💧 实验室湿度检测
+</h1>
+
+
+<div id="clock">
+--:--:--
+</div>
+
+
+</header>
+
+
+
+
+<div class="container">
+
+
+
+<div class="back-box">
+
+<button onclick="goHome()">
+
+⬅ 返回首页
+
+</button>
+
+</div>
+
+
+
+
+
+<section class="analysis-card">
+
+
+<h2>
+
+💧 湿度实时数据
+
+</h2>
+
+
+
+
+<div class="data-box">
+
+
+<div>
+
+当前值
+
+<br>
+
+<span id="current">
+--
+</span>
+
+%
+
+</div>
+
+
+
+
+<div>
+
+最大值
+
+<br>
+
+<span id="max">
+--
+</span>
+
+%
+
+</div>
+
+
+
+
+<div>
+
+最小值
+
+<br>
+
+<span id="min">
+--
+</span>
+
+%
+
+</div>
+
+
+
+
+<div>
+
+安全阈值
+
+<br>
+
+70%
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+<div id="state"
+class="safe">
+
+检测中
+
+</div>
+
+
+
+
+
+<canvas id="analysisChart"></canvas>
+
+
+
+</section>
+
+
+
+
+</div>
+
+
+
+
+
+<script src="/static/analysis.js"></script>
+
+
+
+<script>
+
+function updateClock(){
+
+clock.innerHTML=
+new Date()
+.toLocaleString();
+
+}
+
+setInterval(
+updateClock,
+1000
+);
+
+updateClock();
+
+</script>
+
+
+
+</body>
+
+
+</html>
