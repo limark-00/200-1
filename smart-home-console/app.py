@@ -19,6 +19,7 @@ app.py —— FastAPI 主程序
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import os
@@ -1004,6 +1005,61 @@ async def api_upload_reference(file: UploadFile):
         return {"ok": True, "filepath": f"static/uploads/{filename}", "filename": filename}
     except Exception as exc:
         return JSONResponse(status_code=500, content={"ok": False, "error": str(exc)})
+
+
+# ==================== 远程摄像头推流 ====================
+
+import threading
+
+_remote_frame: bytes = b""
+_remote_frame_lock = threading.Lock()
+
+
+@app.post("/api/vision/frame/upload", summary="上传摄像头帧")
+async def api_upload_frame(request: Request):
+    """接收本地摄像头推送的 JPEG 帧，存到内存供 MJPEG 流使用。"""
+    global _remote_frame
+    body = await request.body()
+    if len(body) > 2 * 1024 * 1024:
+        return JSONResponse(status_code=400, content={"ok": False, "error": "帧太大"})
+    with _remote_frame_lock:
+        _remote_frame = body
+    return {"ok": True, "size": len(body)}
+
+
+@app.get("/api/vision/stream/remote", summary="远程摄像头 MJPEG 流")
+async def api_remote_mjpeg():
+    """MJPEG 流——从 _remote_frame 读取，浏览器可直接 <img> 显示。"""
+
+    async def generate():
+        while True:
+            with _remote_frame_lock:
+                frame = _remote_frame
+            if not frame:
+                # 无画面时返回绿屏占位
+                import io
+                try:
+                    from PIL import Image
+
+                    img = Image.new("RGB", (640, 480), (0, 80, 0))
+                    buf = io.BytesIO()
+                    img.save(buf, "JPEG", quality=80)
+                    frame = buf.getvalue()
+                except Exception:
+                    frame = b""
+                    await asyncio.sleep(1)
+                    continue
+
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+            )
+            await asyncio.sleep(0.1)  # ~10 FPS
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 if __name__ == "__main__":
