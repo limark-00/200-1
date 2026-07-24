@@ -2642,8 +2642,10 @@
       sendBtn.disabled = true;
       addChatMessage("user", text);
 
-      const loadingMsg = addChatMessage("assistant", "思考中...", false);
-      loadingMsg.querySelector(".chat-bubble").className = "chat-loading";
+      const replyMsg = addChatMessage("assistant", "");
+      const bubble = replyMsg.querySelector(".chat-bubble");
+      bubble.className = "chat-loading";
+      let streamedContent = "";
 
       try {
         const resp = await fetch("/api/chat", {
@@ -2651,24 +2653,62 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text,
-            history: chatHistory
+            history: chatHistory,
+            stream: true
           })
         });
-        const data = await resp.json();
 
-        loadingMsg.remove();
-
-        if (data.ok) {
-          addChatMessage("assistant", data.reply);
-          chatHistory.push({ role: "user", content: text });
-          chatHistory.push({ role: "assistant", content: data.reply });
-          if (chatHistory.length > 20) chatHistory.splice(0, 2);
-        } else {
-          addChatMessage("error", "错误：" + (data.error || "请求失败"), true);
+        if (!resp.ok) {
+          // 流式失败，回退非流式
+          const data = await resp.json();
+          bubble.className = "chat-bubble";
+          bubble.textContent = "错误：" + (data.error || "请求失败");
+          replyMsg.className = "chat-message error";
+          return;
         }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+            try {
+              const parsed = JSON.parse(line.substring(6));
+              if (parsed.content) {
+                streamedContent += parsed.content;
+                bubble.className = "chat-bubble";
+                bubble.textContent = streamedContent;
+                const container = document.getElementById("chatMessages");
+                container.scrollTop = container.scrollHeight;
+              }
+              if (parsed.error) {
+                bubble.className = "chat-bubble";
+                bubble.textContent = "错误：" + parsed.error;
+                replyMsg.className = "chat-message error";
+              }
+            } catch (_) {}
+          }
+        }
+
+        // 流式完成
+        bubble.className = "chat-bubble";
+        chatHistory.push({ role: "user", content: text });
+        chatHistory.push({ role: "assistant", content: streamedContent });
+        if (chatHistory.length > 20) chatHistory.splice(0, 2);
+
       } catch (e) {
-        loadingMsg.remove();
-        addChatMessage("error", "网络错误：" + e.message, true);
+        bubble.className = "chat-bubble";
+        bubble.textContent = "网络错误：" + e.message;
+        replyMsg.className = "chat-message error";
       } finally {
         sendBtn.disabled = false;
         input.focus();
