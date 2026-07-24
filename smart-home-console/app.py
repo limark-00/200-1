@@ -849,16 +849,10 @@ class ChatBody(BaseModel):
 
 @app.post("/api/chat", summary="AI 智能助手对话")
 async def api_chat(body: ChatBody):
-    """与混元大模型对话，自动注入当前传感器数据作为上下文。支持流式 SSE 输出。"""
-    api_key = getattr(config, "HUNYUAN_API_KEY", "")
+    """与大模型对话（百炼 qwen-plus），自动注入传感器数据。支持流式 SSE。"""
+    api_key = getattr(config, "DASHSCOPE_API_KEY", "") or getattr(config, "HUNYUAN_API_KEY", "")
     if not api_key:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "ok": False,
-                "error": "未配置混元 API Key，请设置环境变量 HUNYUAN_API_KEY",
-            },
-        )
+        return JSONResponse(status_code=503, content={"ok": False, "error": "未配置 API Key"})
 
     sensor_data = llm_service.get_current_sensor_data()
 
@@ -894,16 +888,10 @@ async def api_chat(body: ChatBody):
 
 @app.post("/api/chat/image", summary="AI 图片分析")
 async def api_chat_image(prompt: str = "请描述这张图片的内容"):
-    """用摄像头抓拍一张照片，发送给混元 vision 模型分析。"""
-    api_key = getattr(config, "HUNYUAN_API_KEY", "")
+    """用摄像头抓拍一张照片，发送给 qwen-vl-plus 分析。"""
+    api_key = getattr(config, "DASHSCOPE_API_KEY", "") or getattr(config, "HUNYUAN_API_KEY", "")
     if not api_key:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "ok": False,
-                "error": "未配置混元 API Key，请设置环境变量 HUNYUAN_API_KEY",
-            },
-        )
+        return JSONResponse(status_code=503, content={"ok": False, "error": "未配置 API Key"})
 
     # 抓拍当前画面
     capture = camera.capture_photo()
@@ -929,18 +917,16 @@ async def api_chat_image(prompt: str = "请描述这张图片的内容"):
 
 @app.get("/api/llm/status", summary="查询 LLM 服务状态")
 async def api_llm_status():
-    """返回混元大模型配置和可用性。"""
-    api_key = getattr(config, "HUNYUAN_API_KEY", "")
-    img_key = getattr(config, "HUNYUAN_IMAGE_API_KEY", "")
+    """返回大模型配置和可用性。"""
+    api_key = getattr(config, "DASHSCOPE_API_KEY", "") or getattr(config, "HUNYUAN_API_KEY", "")
     return {
         "ok": True,
         "configured": bool(api_key),
-        "image_configured": bool(img_key),
-        "provider": "混元 (腾讯云)",
-        "model": getattr(config, "HUNYUAN_MODEL", "hy3-preview"),
-        "vision_model": getattr(config, "HUNYUAN_VISION_MODEL", "hunyuan-vision"),
+        "provider": "百炼 (阿里云)",
+        "model": getattr(config, "DASHSCOPE_MODEL", "qwen-plus"),
+        "vision_model": getattr(config, "DASHSCOPE_VISION_MODEL", "qwen-vl-plus"),
+        "image_configured": bool(getattr(config, "HUNYUAN_IMAGE_API_KEY", "")),
         "image_model": getattr(config, "HUNYUAN_IMAGE_MODEL", "hy-image-v3.0"),
-        "base_url": getattr(config, "HUNYUAN_BASE_URL", "https://tokenhub-intl.tencentmaas.com/v1"),
     }
 
 

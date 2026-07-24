@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LLM 服务 — 封装混元对话、系统提示词和传感器数据注入。"""
+"""LLM 服务 — 百炼 qwen-plus（对话）+ qwen-vl-plus（识图）。"""
 
 from __future__ import annotations
 
@@ -37,18 +37,18 @@ _client: HunyuanClient | None = None
 
 
 def _get_client() -> HunyuanClient | None:
-    """延迟初始化混元客户端。"""
+    """延迟初始化大模型客户端（优先百炼，fallback 混元）。"""
     global _client
     if _client is not None:
         return _client
-    api_key = getattr(config, "HUNYUAN_API_KEY", "")
+    api_key = getattr(config, "DASHSCOPE_API_KEY", "") or getattr(config, "HUNYUAN_API_KEY", "")
     if not api_key:
         return None
     _client = HunyuanClient(
         api_key=api_key,
-        base_url=getattr(config, "HUNYUAN_BASE_URL", "https://api.hunyuan.cloud.tencent.com/v1"),
-        model=getattr(config, "HUNYUAN_MODEL", "hunyuan-turbos-latest"),
-        vision_model=getattr(config, "HUNYUAN_VISION_MODEL", "hunyuan-vision"),
+        base_url=getattr(config, "DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+        model=getattr(config, "DASHSCOPE_MODEL", "qwen-plus"),
+        vision_model=getattr(config, "DASHSCOPE_VISION_MODEL", "qwen-vl-plus"),
     )
     return _client
 
@@ -73,7 +73,7 @@ def chat(
     """
     client = _get_client()
     if client is None:
-        return {"ok": False, "error": "未配置 HUNYUAN_API_KEY，请在环境变量中设置"}
+        return {"ok": False, "error": "未配置 DASHSCOPE_API_KEY 或 HUNYUAN_API_KEY，请在环境变量中设置"}
 
     # 构建消息列表
     system_msg = SYSTEM_PROMPT
@@ -127,7 +127,7 @@ def chat_about_image(
     """
     client = _get_client()
     if client is None:
-        return {"ok": False, "error": "未配置 HUNYUAN_API_KEY，请在环境变量中设置"}
+        return {"ok": False, "error": "未配置 DASHSCOPE_API_KEY 或 HUNYUAN_API_KEY，请在环境变量中设置"}
 
     result = client.chat_with_image(image_path, prompt)
     if "error" in result:

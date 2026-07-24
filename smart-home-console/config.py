@@ -85,6 +85,13 @@ HUNYUAN_VISION_MODEL = os.getenv("HUNYUAN_VISION_MODEL", "hunyuan-vision").strip
 HUNYUAN_TEMPERATURE = float(os.getenv("HUNYUAN_TEMPERATURE", "0.7"))
 HUNYUAN_MAX_TOKENS = int(os.getenv("HUNYUAN_MAX_TOKENS", "2048"))
 
+# 阿里云百炼（DashScope）配置 — 对话 + 识图
+# 一把 key 搞定 qwen-plus（对话） + qwen-vl-plus（识图）
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "").strip()
+DASHSCOPE_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
+DASHSCOPE_MODEL = os.getenv("DASHSCOPE_MODEL", "qwen-plus").strip()
+DASHSCOPE_VISION_MODEL = os.getenv("DASHSCOPE_VISION_MODEL", "qwen-vl-plus").strip()
+
 # 混元文生图配置
 # HY-Image-3.0: 0.2元/张, 免费50张
 HUNYUAN_IMAGE_API_KEY = os.getenv("HUNYUAN_IMAGE_API_KEY", "").strip()
