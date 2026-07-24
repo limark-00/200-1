@@ -911,11 +911,12 @@ async def api_llm_status():
 class ImageGenBody(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=1000, description="图片描述文本")
     model: str = Field(default="hy-image-lite", description="模型: hy-image-lite / hy-image-v3.0")
+    reference_image: str = Field(default="", description="参考图路径（仅v3.0支持图生图）")
 
 
 @app.post("/api/chat/image/generate", summary="AI 文生图")
 async def api_image_generate(body: ImageGenBody):
-    """文生图。默认 hy-image-lite（同步快速，0.099元/张），可选 hy-image-v3.0（高质量，0.2元/张）。"""
+    """文生图/图生图。hy-image-lite（同步，0.099元/张），hy-image-v3.0（高质量+参考图，0.2元/张）。"""
     api_key = getattr(config, "HUNYUAN_IMAGE_API_KEY", "")
     if not api_key:
         return JSONResponse(
@@ -924,14 +925,24 @@ async def api_image_generate(body: ImageGenBody):
         )
 
     model = body.model.strip()
-    from hunyuan_image import HunyuanImageClient
+    from hunyuan_image import HunyuanImageClient, image_path_to_b64
 
     client = HunyuanImageClient(
         api_key=api_key,
         base_url=getattr(config, "HUNYUAN_IMAGE_BASE_URL", "https://tokenhub.tencentmaas.com/v1"),
         model=model,
     )
-    result = client.generate(body.prompt)
+
+    reference_b64 = ""
+    if body.reference_image and model != "hy-image-lite":
+        if not os.path.exists(body.reference_image):
+            return JSONResponse(
+                status_code=400,
+                content={"ok": False, "error": f"参考图不存在: {body.reference_image}"},
+            )
+        reference_b64 = image_path_to_b64(body.reference_image)
+
+    result = client.generate(body.prompt, reference_b64=reference_b64)
 
     if not result.get("ok"):
         return JSONResponse(status_code=502, content=result)

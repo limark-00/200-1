@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""混元文生图客户端 — HY-Image-3.0 提交/轮询接口 + HY-Image-Lite 同步接口。"""
+"""混元文生图客户端 — HY-Image-3.0 + HY-Image-Lite。"""
 
 from __future__ import annotations
 
+import base64
 import time
 from typing import Any
 
@@ -46,20 +47,19 @@ class HunyuanImageClient:
         height: int = 1024,
         poll_interval: float = 2.0,
         max_retries: int = 30,
+        reference_b64: str = "",
     ) -> dict[str, Any]:
         """文生图，根据 self.model 自动选协议。
 
         - hy-image-lite: 同步 POST /v1/api/image/lite
-        - hy-image-v3.0: 异步 submit → poll
+        - hy-image-v3.0: 异步 submit → poll（可选参考图）
 
-        Returns:
-            {"ok": True, "image_url": "...", "task_id": "..."}
-            或 {"ok": False, "error": "..."}
+        reference_b64: 参考图 base64 (data:image/...;base64,xxx)，仅 v3.0 支持
         """
         if self.model == self.LITE_MODEL:
             return self._generate_lite(prompt)
 
-        return self._generate_pro(prompt, negative_prompt, width, height, poll_interval, max_retries)
+        return self._generate_pro(prompt, negative_prompt, width, height, poll_interval, max_retries, reference_b64)
 
     def _generate_lite(self, prompt: str) -> dict[str, Any]:
         """Lite 版：单次请求同步返回图片 URL。"""
@@ -98,8 +98,9 @@ class HunyuanImageClient:
         height: int,
         poll_interval: float,
         max_retries: int,
+        reference_b64: str = "",
     ) -> dict[str, Any]:
-        """专业版：异步提交 + 轮询结果。"""
+        """专业版：异步提交 + 轮询结果。reference_b64: 参考图 base64（图生图模式）."""
         submit_url = f"{self.base_url}/api/image/submit"
         payload = {
             "model": self.model,
@@ -109,6 +110,8 @@ class HunyuanImageClient:
         }
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
+        if reference_b64:
+            payload["image"] = reference_b64
 
         try:
             resp = requests.post(submit_url, headers=self._headers, json=payload, timeout=30)
@@ -158,3 +161,11 @@ class HunyuanImageClient:
                 }
 
         return {"ok": False, "error": f"轮询超时，已等待 {max_retries * poll_interval}s"}
+
+
+def image_path_to_b64(path: str) -> str:
+    """本地图片 → data:image/xxx;base64,..."""
+    ext = path.rsplit(".", 1)[-1].lower()
+    mime = "image/jpeg" if ext in {"jpg", "jpeg"} else f"image/{ext}"
+    with open(path, "rb") as f:
+        return f"data:{mime};base64,{base64.b64encode(f.read()).decode()}"
