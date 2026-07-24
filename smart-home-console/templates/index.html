@@ -948,7 +948,7 @@
           <img
             id="visionStream"
             class="vision-frame"
-            src="/api/vision/stream/remote"
+            src=""
             alt="YOLO实时人员识别画面"
           />
           <canvas
@@ -2296,7 +2296,14 @@
     function reconnectVisionStream() {
       const stream = document.getElementById("visionStream");
       const separator = "/api/vision/stream/remote".includes("?") ? "&" : "?";
-      stream.src = `/api/vision/stream/remote${separator}t=${Date.now()}`;
+      // 自动选择流：有本地摄像头用本地，否则用远程推流
+      let streamUrl;
+      if (status.camera_online && status.enabled) {
+        streamUrl = "/api/vision/stream";
+      } else {
+        streamUrl = "/api/vision/stream/remote";
+      }
+      stream.src = `${streamUrl}${separator}t=${Date.now()}`;
       document.getElementById("visionStateText").textContent =
         "正在重连画面";
     }
