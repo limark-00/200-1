@@ -17,7 +17,7 @@ ENV_TOPIC = os.getenv("BEMFA_ENV_TOPIC", "env004").strip()
 # 上行数据主题：开发板向该主题发布温湿度和蜂鸣器状态，主机读取该主题。
 ENV_PUB_TOPIC = os.getenv(
     "BEMFA_ENV_PUB_TOPIC",
-    f"{ENV_TOPIC}/up",
+    ENV_TOPIC,
 ).strip()
 
 # 温湿度、气体等环境数据都从上行主题读取。

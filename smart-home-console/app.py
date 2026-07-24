@@ -543,7 +543,7 @@ async def api_control(body: ControlBody):
 
 @app.get("/api/env", summary="读取env004最新环境数据")
 async def api_env():
-    result = bemfa_api.get_topic_msg(config.ENV_PUB_TOPIC)
+    result = bemfa_api.get_topic_msg(config.ENV_TOPIC)
     if not result.get("ok"):
         return JSONResponse(content=result, status_code=502)
     result["data"] = bemfa_api.parse_env_message(result.get("msg", ""))
