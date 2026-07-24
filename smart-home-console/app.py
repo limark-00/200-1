@@ -522,6 +522,12 @@ async def profile_page(request: Request):
     return templates.TemplateResponse(request, "profile.html", context={})
 
 
+@app.get("/api/history", summary="历史数据（占位）")
+async def api_history():
+    """返回历史环境数据。当前为占位实现，后续可接入时序数据库。"""
+    return {"ok": True, "labels": [], "data": {"temperature": [], "humidity": [], "gas": [], "light": []}}
+
+
 # ==================== API（路径与原先 Flask 版保持一致，前端不用改）====================
 
 @app.get("/api/mode", summary="查询运行模式")
