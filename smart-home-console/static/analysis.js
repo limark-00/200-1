@@ -22,9 +22,9 @@ window.onload = function () {
 // 检查巴法云连接状态
 async function checkBemfaStatus() {
   try {
-    const res = await fetch("/api/bemfa/status");
+    const res = await fetch("/api/llm/status");
     const data = await res.json();
-    connected = data.connected;
+    connected = data.configured;
     const el = document.getElementById("buzzerStatus");
     if (el) el.textContent = "蜂鸣器: " + (connected ? "已连接" : "未连接");
   } catch (e) {}
@@ -61,12 +61,22 @@ async function updateData() {
     // 气体页红灯
     const redLight = document.getElementById("redLight");
     if (redLight) redLight.className = "red-light" + (danger ? " on" : "");
-    // 图表
-    const histRes = await fetch("/api/history");
-    const histResult = await histRes.json();
-    if (histResult.ok) updateChartFromHistory(histResult);
+    // 图表用本地缓存数据
+    updateChartFromLocal();
   } catch (e) {
     console.log("数据获取失败:", e);
+  }
+}
+
+function updateChartFromLocal() {
+  labels.length = 0;
+  const start = Math.max(0, values.length - 50);
+  for (let i = start; i < values.length; i++) { labels.push(i); }
+  if (chart) {
+    chart.data.labels = labels.slice(-50);
+    chart.data.datasets[0].data = values.slice(-50);
+    chart.data.datasets[1].data = values.slice(-50).map(() => limit);
+    chart.update();
   }
 }
 
@@ -108,10 +118,10 @@ async function triggerAlarm() {
   const btn = document.getElementById("btnAlarm");
   if (btn) { btn.textContent = "已报警"; btn.disabled = true; }
   try {
-    await fetch("/api/bemfa/alarm", {
+    await fetch("/api/env/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: type, action: "on" })
+      body: JSON.stringify({ msg: "alarm_on" })
     });
   } catch (e) {}
 }
@@ -122,10 +132,10 @@ async function stopAlarm() {
   const btn = document.getElementById("btnAlarm");
   if (btn) { btn.textContent = "报警"; }
   try {
-    await fetch("/api/bemfa/alarm", {
+    await fetch("/api/env/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: type, action: "off" })
+      body: JSON.stringify({ msg: "alarm_off" })
     });
   } catch (e) {}
   // 重新判断是否还能报警
