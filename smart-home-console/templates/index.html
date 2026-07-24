@@ -2750,18 +2750,21 @@
       } catch(e) {}
     }
 
-    function _updateSendButton() {
+    const genBtn = document.createElement("button");
+    genBtn.className = "chat-send-button";
+    genBtn.textContent = "生图";
+    genBtn.style.cssText = "background:#e67e22; display:none; white-space:nowrap;";
+    genBtn.id = "imageGenButton";
+    document.getElementById("chatInput").parentNode.insertBefore(
+      genBtn, document.getElementById("chatInput").nextSibling
+    );
+
+    function _updateGenButton() {
       const refFile = document.getElementById("imageRef").value;
-      const btn = document.getElementById("chatSendButton");
-      const input = document.getElementById("chatInput");
       if (refFile || uploadedRefPath) {
-        btn.textContent = "生图";
-        btn.style.background = "#e67e22";
-        input.placeholder = "输入生图提示词...";
+        genBtn.style.display = "inline-block";
       } else {
-        btn.textContent = "发送";
-        btn.style.background = "";
-        input.placeholder = "输入消息，例如：当前环境温度正常吗？";
+        genBtn.style.display = "none";
       }
     }
 
@@ -2770,7 +2773,7 @@
         this.value = "";
         document.getElementById("imageUpload").click();
       }
-      _updateSendButton();
+      _updateGenButton();
     });
 
     document.getElementById("imageUpload").addEventListener("change", async (e) => {
@@ -2783,7 +2786,7 @@
         const data = await resp.json();
         if (data.ok) {
           uploadedRefPath = data.filepath;
-          _updateSendButton();
+          _updateGenButton();
         } else {
           alert("上传失败：" + (data.error || "未知错误"));
         }
@@ -2792,56 +2795,42 @@
       }
     });
 
-    // 发送逻辑：按钮状态决定走对话还是生图
-    const _origSend = sendChatMessage;
-    sendChatMessage = async function() {
+    genBtn.addEventListener("click", async () => {
+      const prompt = document.getElementById("chatInput").value.trim();
       const refFile = document.getElementById("imageRef").value;
       const refPath = uploadedRefPath || (refFile && refFile !== "__upload__" ? "static/vision_events/" + refFile : "");
-      const prompt = document.getElementById("chatInput").value.trim();
+      if (!prompt || !refPath) return;
 
-      if (refPath) {
-        if (!prompt) return;
-        document.getElementById("chatInput").value = "";
-        addChatMessage("user", "🎨 生图:" + prompt);
-        const replyMsg = addChatMessage("assistant", "");
-        const bubble = replyMsg.querySelector(".chat-bubble");
-        bubble.className = "chat-loading";
-        bubble.textContent = "生成中...";
+      document.getElementById("chatInput").value = "";
+      addChatMessage("user", "🎨 " + prompt);
+      const replyMsg = addChatMessage("assistant", "");
+      const bubble = replyMsg.querySelector(".chat-bubble");
+      bubble.className = "chat-loading";
+      bubble.textContent = "生成中...";
 
-        try {
-          const resp = await fetch("/api/chat/image/generate", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              prompt: prompt, model: "hy-image-v3.0", reference_image: refPath
-            })
-          });
-          const data = await resp.json();
-          if (data.ok && data.image_url) {
-            bubble.className = "chat-bubble";
-            bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
-          } else {
-            bubble.className = "chat-bubble";
-            bubble.textContent = "错误：" + (data.error || "生成失败");
-            replyMsg.className = "chat-message error";
-          }
-        } catch(e) {
+      try {
+        const resp = await fetch("/api/chat/image/generate", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, model: "hy-image-v3.0", reference_image: refPath })
+        });
+        const data = await resp.json();
+        if (data.ok && data.image_url) {
           bubble.className = "chat-bubble";
-          bubble.textContent = "网络错误：" + e.message;
+          bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
+        } else {
+          bubble.className = "chat-bubble";
+          bubble.textContent = "错误：" + (data.error || "生成失败");
           replyMsg.className = "chat-message error";
         }
-        uploadedRefPath = "";
-        document.getElementById("imageRef").value = "";
-        _updateSendButton();
-      } else {
-        _origSend();
+      } catch(e) {
+        bubble.className = "chat-bubble";
+        bubble.textContent = "网络错误：" + e.message;
+        replyMsg.className = "chat-message error";
       }
-    };
-
-    // 重新绑定发送按钮
-    const sendBtn = document.getElementById("chatSendButton");
-    const newBtn = sendBtn.cloneNode(true);
-    sendBtn.parentNode.replaceChild(newBtn, sendBtn);
-    newBtn.addEventListener("click", () => sendChatMessage());
+      uploadedRefPath = "";
+      document.getElementById("imageRef").value = "";
+      _updateGenButton();
+    });
 
     loadImageRefOptions();
     checkChatStatus();
