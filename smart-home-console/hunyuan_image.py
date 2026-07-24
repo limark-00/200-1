@@ -111,7 +111,7 @@ class HunyuanImageClient:
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
         if reference_b64:
-            payload["image"] = reference_b64
+            payload["reference_image"] = reference_b64
 
         try:
             resp = requests.post(submit_url, headers=self._headers, json=payload, timeout=30)
