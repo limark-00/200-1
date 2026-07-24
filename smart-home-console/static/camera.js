@@ -7,28 +7,27 @@ let muted = false;
 // 摄像头信息
 async function getCameraInfo() {
   try {
-    const res = await fetch("/api/camera/info");
+    const res = await fetch("/api/vision/status");
     const data = await res.json();
-    if (!data.ok) return;
     // 状态点
     const dot = document.getElementById("statusDot");
     const txt = document.getElementById("statusText");
-    if (dot) dot.className = "cam-status-dot" + (data.connected ? " online" : "");
-    if (txt) txt.textContent = data.connected ? "实时识别中" : "离线";
+    if (dot) dot.className = "cam-status-dot" + (data.running ? " online" : "");
+    if (txt) txt.textContent = data.running ? "实时识别中" : (data.enabled ? "连接中..." : "离线");
     // 总人数
     const peopleEl = document.getElementById("people");
-    if (peopleEl) peopleEl.textContent = data.people;
+    if (peopleEl) peopleEl.textContent = data.people_count;
     // FPS
     const fpsEl = document.getElementById("fps");
-    if (fpsEl) fpsEl.textContent = data.fps + " FPS";
+    if (fpsEl) fpsEl.textContent = data.fps.toFixed(1) + " FPS";
     // 索引
     const idxEl = document.getElementById("cameraIndex");
     if (idxEl) idxEl.textContent = data.camera_index;
-    // 区域内人数 - 只有设置了危险区域才显示
+    // 区域内人数
     const areaPeopleEl = document.getElementById("areaPeople");
     const areaRow = document.getElementById("areaPeopleRow");
-    if (data.has_danger_area) {
-      if (areaPeopleEl) areaPeopleEl.textContent = data.area_people;
+    if (data.zone && data.zone.enabled) {
+      if (areaPeopleEl) areaPeopleEl.textContent = data.people_in_zone;
       if (areaRow) areaRow.style.display = "";
     } else {
       if (areaRow) areaRow.style.display = "none";
@@ -39,32 +38,31 @@ async function getCameraInfo() {
 // 加载告警事件
 async function loadAlarmEvents() {
   try {
-    const res = await fetch("/api/camera/alarm");
+    const res = await fetch("/api/vision/events?limit=20");
     const data = await res.json();
-    if (!data.ok) return;
     const list = document.getElementById("eventList");
     if (!list) return;
     list.innerHTML = "";
-    if (data.data.length === 0) {
+    const events = data.events || [];
+    if (events.length === 0) {
       list.innerHTML = '<div class="cam-event-empty">暂无告警事件</div>';
       return;
     }
-    data.data.reverse().forEach((item, i) => {
-      const num = data.data.length - i;
+    events.forEach((item) => {
       const div = document.createElement("div");
       div.className = "cam-event-item";
       div.innerHTML =
         '<div class="cam-event-header">' +
-          '<strong>事件 #' + num + '</strong>' +
-          '<span class="cam-event-status ended">已结束</span>' +
+          '<strong>事件 #' + item.id + '</strong>' +
+          '<span class="cam-event-status ended">' + (item.ended_at ? '已结束' : '进行中') + '</span>' +
         '</div>' +
         '<div class="cam-event-detail">' +
-          '<div><span>时间：</span>' + item.time + '</div>' +
-          '<div><span>状态：</span>' + item.status + '</div>' +
-          '<div><span>人数：</span>' + (item.people || '--') + '</div>' +
+          '<div><span>时间：</span>' + item.started_at + '</div>' +
+          '<div><span>人数：</span>' + item.max_people + '</div>' +
+          '<div><span>原因：</span>' + (item.close_reason || '--') + '</div>' +
         '</div>' +
-        (item.image && item.image !== "/static/no-image.png" ?
-          '<a class="cam-event-link" onclick="openLightbox(\'' + item.image + '\')">查看告警截图</a>' : '');
+        (item.snapshot_filename ?
+          '<a class="cam-event-link" onclick="openLightbox(\'/vision-events/' + item.snapshot_filename + '\')">查看告警截图</a>' : '');
       list.appendChild(div);
     });
   } catch (e) {}
@@ -73,7 +71,7 @@ async function loadAlarmEvents() {
 // 重连画面
 function reconnectCamera() {
   const img = document.getElementById("cameraVideo");
-  if (img) img.src = "/camera?" + Date.now();
+  if (img) img.src = "/api/vision/stream/remote?" + Date.now();
 }
 
 // 取消报警并禁音

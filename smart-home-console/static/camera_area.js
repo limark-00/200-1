@@ -107,7 +107,7 @@ function onMouseLeave() {
 
 async function loadArea() {
   try {
-    const res = await fetch("/api/camera/area");
+    const res = await fetch("/api/vision/zone");
     const data = await res.json();
     if (data.ok && data.area) {
       dangerArea = data.area;
@@ -125,7 +125,7 @@ async function loadArea() {
 async function saveAreaToServer() {
   if (!dangerArea) return;
   try {
-    await fetch("/api/camera/area", {
+    await fetch("/api/vision/zone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dangerArea)
@@ -172,7 +172,7 @@ async function deleteArea() {
   canvas.style.cursor = "default";
   clearCanvas();
   try {
-    await fetch("/api/camera/area", {
+    await fetch("/api/vision/zone", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ x1: 0, y1: 0, x2: 0, y2: 0 })
