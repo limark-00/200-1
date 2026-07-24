@@ -1227,10 +1227,13 @@
           maxlength="2000"
         />
         <button type="button" id="chatSendButton" class="chat-send-button">发送</button>
-        <select id="imageRef" style="background:#1a1a2e; color:#888; border:1px solid #444; border-radius:6px; padding:6px; font-size:12px; max-width:100px;">
-          <option value="">参考图</option>
+      </div>
+      <div style="display:flex; gap:6px; padding-top:6px;">
+        <select id="imageRef" style="background:#1a1a2e; color:#888; border:1px solid #444; border-radius:6px; padding:6px; font-size:12px;">
+          <option value="">📎 选事件截图</option>
         </select>
         <input type="file" id="imageUpload" accept="image/*" style="display:none" />
+        <span id="refHint" style="color:#888; font-size:11px; line-height:30px; display:none;"></span>
       </div>
     </section>
   </main>
@@ -2727,15 +2730,9 @@
       }
     });
 
-    // 参考图选择
-    let uploadedRefPath = "";
-
+    // 选事件直接填到输入框
     async function loadImageRefOptions() {
       const sel = document.getElementById("imageRef");
-      const uplOpt = document.createElement("option");
-      uplOpt.value = "__upload__";
-      uplOpt.textContent = "📤 上传...";
-      sel.appendChild(uplOpt);
       try {
         const resp = await fetch("/api/vision/events?limit=20");
         const data = await resp.json();
@@ -2750,87 +2747,58 @@
       } catch(e) {}
     }
 
-    const genBtn = document.createElement("button");
-    genBtn.className = "chat-send-button";
-    genBtn.textContent = "生图";
-    genBtn.style.cssText = "background:#e67e22; display:none; white-space:nowrap;";
-    genBtn.id = "imageGenButton";
-    document.getElementById("chatInput").parentNode.insertBefore(
-      genBtn, document.getElementById("chatInput").nextSibling
-    );
-
-    function _updateGenButton() {
-      const refFile = document.getElementById("imageRef").value;
-      if (refFile || uploadedRefPath) {
-        genBtn.style.display = "inline-block";
-      } else {
-        genBtn.style.display = "none";
-      }
-    }
-
-    document.getElementById("imageRef").addEventListener("change", async function() {
-      if (this.value === "__upload__") {
-        this.value = "";
-        document.getElementById("imageUpload").click();
-      }
-      _updateGenButton();
-    });
-
-    document.getElementById("imageUpload").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
+    document.getElementById("imageRef").addEventListener("change", function() {
+      const file = this.value;
       if (!file) return;
-      const form = new FormData();
-      form.append("file", file);
-      try {
-        const resp = await fetch("/api/upload/reference", { method: "POST", body: form });
-        const data = await resp.json();
-        if (data.ok) {
-          uploadedRefPath = data.filepath;
-          _updateGenButton();
-        } else {
-          alert("上传失败：" + (data.error || "未知错误"));
-        }
-      } catch(ex) {
-        alert("上传失败：" + ex.message);
-      }
+      const input = document.getElementById("chatInput");
+      input.value = "生图: ";
+      input.focus();
+      // 存到 hidden data
+      input.dataset.refPath = "static/vision_events/" + file;
     });
 
-    genBtn.addEventListener("click", async () => {
-      const prompt = document.getElementById("chatInput").value.trim();
-      const refFile = document.getElementById("imageRef").value;
-      const refPath = uploadedRefPath || (refFile && refFile !== "__upload__" ? "static/vision_events/" + refFile : "");
-      if (!prompt || !refPath) return;
+    // 发送时检测生图指令
+    const _origSend = sendChatMessage;
+    sendChatMessage = async function() {
+      const input = document.getElementById("chatInput");
+      const text = input.value.trim();
+      const refPath = input.dataset.refPath || "";
 
-      document.getElementById("chatInput").value = "";
-      addChatMessage("user", "🎨 " + prompt);
-      const replyMsg = addChatMessage("assistant", "");
-      const bubble = replyMsg.querySelector(".chat-bubble");
-      bubble.className = "chat-loading";
-      bubble.textContent = "生成中...";
+      if (text.startsWith("生图:") && refPath) {
+        const prompt = text.replace(/^生图:\s*/, "");
+        if (!prompt) return;
+        input.value = "";
+        input.dataset.refPath = "";
+        document.getElementById("imageRef").value = "";
 
-      try {
-        const resp = await fetch("/api/chat/image/generate", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, model: "hy-image-v3.0", reference_image: refPath })
-        });
-        const data = await resp.json();
-        if (data.ok && data.image_url) {
+        addChatMessage("user", "🎨 " + prompt);
+        const replyMsg = addChatMessage("assistant", "");
+        const bubble = replyMsg.querySelector(".chat-bubble");
+        bubble.className = "chat-loading";
+        bubble.textContent = "生成中...";
+        try {
+          const resp = await fetch("/api/chat/image/generate", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, model: "hy-image-v3.0", reference_image: refPath })
+          });
+          const data = await resp.json();
+          if (data.ok && data.image_url) {
+            bubble.className = "chat-bubble";
+            bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
+          } else {
+            bubble.className = "chat-bubble";
+            bubble.textContent = "错误：" + (data.error || "生成失败");
+            replyMsg.className = "chat-message error";
+          }
+        } catch(e) {
           bubble.className = "chat-bubble";
-          bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
-        } else {
-          bubble.className = "chat-bubble";
-          bubble.textContent = "错误：" + (data.error || "生成失败");
+          bubble.textContent = "网络错误：" + e.message;
           replyMsg.className = "chat-message error";
         }
-      } catch(e) {
-        bubble.className = "chat-bubble";
-        bubble.textContent = "网络错误：" + e.message;
-        replyMsg.className = "chat-message error";
+      } else {
+        _origSend();
       }
-      uploadedRefPath = "";
-      document.getElementById("imageRef").value = "";
-      _updateGenButton();
-    });
+    };
 
     loadImageRefOptions();
     checkChatStatus();
