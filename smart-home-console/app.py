@@ -999,6 +999,26 @@ async def api_upload_reference(file: UploadFile):
         return JSONResponse(status_code=500, content={"ok": False, "error": str(exc)})
 
 
+# ==================== 摄像头快照 ====================
+
+@app.get("/api/vision/camera/snapshot", summary="摄像头快照")
+async def api_camera_snapshot():
+    """返回当前缓存的摄像头帧（JPEG），供前端轮询使用。"""
+    frame = _remote_frame
+    if not frame:
+        # 无远程帧时尝试调用本地 camera 抓拍
+        try:
+            cap_result = camera.capture_photo()
+            if cap_result.get("ok") and cap_result.get("path"):
+                with open(cap_result["path"], "rb") as f:
+                    frame = f.read()
+        except Exception:
+            pass
+    if not frame:
+        return JSONResponse(status_code=503, content={"ok": False, "error": "无可用画面"})
+    return Response(content=frame, media_type="image/jpeg")
+
+
 # ==================== 远程摄像头推流 ====================
 
 import threading
