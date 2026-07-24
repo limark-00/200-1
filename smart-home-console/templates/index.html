@@ -1233,6 +1233,8 @@
         <select id="imageRef" style="width:180px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:8px; margin:0 4px;">
           <option value="">无参考图</option>
         </select>
+        <input type="file" id="imageUpload" accept="image/*" style="display:none" />
+        <button type="button" id="imageUploadBtn" class="chat-send-button" style="white-space:nowrap; background:#333;">+上传</button>
         <button type="button" id="imageGenButton" class="chat-send-button" style="white-space:nowrap;">生图</button>
       </div>
     </section>
@@ -2747,6 +2749,31 @@
       } catch(e) {}
     }
 
+    // 上传参考图
+    let uploadedRefPath = "";
+    document.getElementById("imageUploadBtn").addEventListener("click", () => {
+      document.getElementById("imageUpload").click();
+    });
+    document.getElementById("imageUpload").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const resp = await fetch("/api/upload/reference", { method: "POST", body: form });
+        const data = await resp.json();
+        if (data.ok) {
+          uploadedRefPath = data.filepath;
+          document.getElementById("imageUploadBtn").textContent = "已上传";
+          document.getElementById("imageUploadBtn").style.background = "#28a745";
+        } else {
+          alert("上传失败：" + (data.error || "未知错误"));
+        }
+      } catch(ex) {
+        alert("上传失败：" + ex.message);
+      }
+    });
+
     // 生图
     async function generateImage() {
       const prompt = document.getElementById("imagePrompt").value.trim();
@@ -2755,20 +2782,23 @@
 
       const btn = document.getElementById("imageGenButton");
       btn.disabled = true;
-      const msg = addChatMessage("user", "生图：" + prompt + (refFile ? " (参考事件截图)" : ""));
+      let label = "生图：" + prompt;
+      if (uploadedRefPath) label += " (上传参考图)";
+      else if (refFile) label += " (事件截图)";
+      const msg = addChatMessage("user", label);
       const replyMsg = addChatMessage("assistant", "");
       const bubble = replyMsg.querySelector(".chat-bubble");
       bubble.className = "chat-loading";
       bubble.textContent = "生成中...";
 
       try {
-        const refPath = refFile ? "static/vision_events/" + refFile : "";
+        const refPath = uploadedRefPath || (refFile ? "static/vision_events/" + refFile : "");
         const resp = await fetch("/api/chat/image/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt: prompt,
-            model: refFile ? "hy-image-v3.0" : "hy-image-lite",
+            model: refPath ? "hy-image-v3.0" : "hy-image-lite",
             reference_image: refPath
           })
         });

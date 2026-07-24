@@ -31,7 +31,7 @@ from typing import Any
 from urllib.parse import quote
 
 import uvicorn
-from fastapi import FastAPI, Path as ApiPath, Query, Request
+from fastapi import FastAPI, Path as ApiPath, Query, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -948,6 +948,31 @@ async def api_image_generate(body: ImageGenBody):
         return JSONResponse(status_code=502, content=result)
 
     return result
+
+
+# ==================== 图片上传（生图参考图）====================
+
+@app.post("/api/upload/reference", summary="上传参考图片")
+async def api_upload_reference(file: UploadFile):
+    """上传一张图片作为生图参考。存到 static/uploads/ 目录。"""
+    import uuid
+
+    upload_dir = os.path.join(BASE_DIR, "static", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or "image.jpg")[1] or ".jpg"
+    filename = f"{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    try:
+        contents = await file.read()
+        if len(contents) > 10 * 1024 * 1024:
+            return JSONResponse(status_code=400, content={"ok": False, "error": "图片不能超过 10MB"})
+        with open(filepath, "wb") as f:
+            f.write(contents)
+        return {"ok": True, "filepath": f"static/uploads/{filename}", "filename": filename}
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"ok": False, "error": str(exc)})
 
 
 if __name__ == "__main__":
