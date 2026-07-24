@@ -893,14 +893,48 @@ async def api_chat_image(prompt: str = "请描述这张图片的内容"):
 async def api_llm_status():
     """返回混元大模型配置和可用性。"""
     api_key = getattr(config, "HUNYUAN_API_KEY", "")
+    img_key = getattr(config, "HUNYUAN_IMAGE_API_KEY", "")
     return {
         "ok": True,
         "configured": bool(api_key),
+        "image_configured": bool(img_key),
         "provider": "混元 (腾讯云)",
-        "model": getattr(config, "HUNYUAN_MODEL", "hunyuan-turbos-latest"),
+        "model": getattr(config, "HUNYUAN_MODEL", "hy3-preview"),
         "vision_model": getattr(config, "HUNYUAN_VISION_MODEL", "hunyuan-vision"),
-        "base_url": getattr(config, "HUNYUAN_BASE_URL", "https://api.hunyuan.cloud.tencent.com/v1"),
+        "image_model": getattr(config, "HUNYUAN_IMAGE_MODEL", "hy-image-v3.0"),
+        "base_url": getattr(config, "HUNYUAN_BASE_URL", "https://tokenhub-intl.tencentmaas.com/v1"),
     }
+
+
+# ==================== 文生图 ====================
+
+class ImageGenBody(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=1000, description="图片描述文本")
+
+
+@app.post("/api/chat/image/generate", summary="AI 文生图")
+async def api_image_generate(body: ImageGenBody):
+    """用 HY-Image-3.0 根据文字描述生成图片。"""
+    api_key = getattr(config, "HUNYUAN_IMAGE_API_KEY", "")
+    if not api_key:
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "error": "未配置文生图 API Key"},
+        )
+
+    from hunyuan_image import HunyuanImageClient
+
+    client = HunyuanImageClient(
+        api_key=api_key,
+        base_url=getattr(config, "HUNYUAN_IMAGE_BASE_URL", "https://tokenhub.tencentmaas.com/v1"),
+        model=getattr(config, "HUNYUAN_IMAGE_MODEL", "hy-image-v3.0"),
+    )
+    result = client.generate(body.prompt)
+
+    if not result.get("ok"):
+        return JSONResponse(status_code=502, content=result)
+
+    return result
 
 
 if __name__ == "__main__":

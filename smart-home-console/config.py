@@ -85,6 +85,12 @@ HUNYUAN_VISION_MODEL = os.getenv("HUNYUAN_VISION_MODEL", "hunyuan-vision").strip
 HUNYUAN_TEMPERATURE = float(os.getenv("HUNYUAN_TEMPERATURE", "0.7"))
 HUNYUAN_MAX_TOKENS = int(os.getenv("HUNYUAN_MAX_TOKENS", "2048"))
 
+# 混元文生图配置
+# HY-Image-3.0: 0.2元/张, 免费50张
+HUNYUAN_IMAGE_API_KEY = os.getenv("HUNYUAN_IMAGE_API_KEY", "").strip()
+HUNYUAN_IMAGE_BASE_URL = os.getenv("HUNYUAN_IMAGE_BASE_URL", "https://tokenhub.tencentmaas.com/v1").strip()
+HUNYUAN_IMAGE_MODEL = os.getenv("HUNYUAN_IMAGE_MODEL", "hy-image-v3.0").strip()
+
 # 保留旧项目兼容字段
 FLASK_HOST = APP_HOST
 FLASK_PORT = APP_PORT
