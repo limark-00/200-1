@@ -1228,6 +1228,13 @@
         />
         <button type="button" id="chatSendButton" class="chat-send-button">发送</button>
       </div>
+      <div class="chat-input-area" style="border-top: 1px solid #333; padding-top: 8px;">
+        <input id="imagePrompt" class="chat-input" style="flex:1" type="text" placeholder="生图提示词，如：漫画风格的监控画面" maxlength="500" />
+        <select id="imageRef" style="width:180px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:8px; margin:0 4px;">
+          <option value="">无参考图</option>
+        </select>
+        <button type="button" id="imageGenButton" class="chat-send-button" style="white-space:nowrap;">生图</button>
+      </div>
     </section>
   </main>
 
@@ -2723,6 +2730,72 @@
       }
     });
 
+    // 加载事件截图到下拉框
+    async function loadImageRefOptions() {
+      try {
+        const resp = await fetch("/api/vision/events?limit=20");
+        const data = await resp.json();
+        const sel = document.getElementById("imageRef");
+        if (data.events) {
+          data.events.forEach(ev => {
+            const opt = document.createElement("option");
+            opt.value = ev.snapshot_filename || "";
+            opt.textContent = "事件#" + ev.id + " " + (ev.snapshot_filename || "").substring(0, 30);
+            sel.appendChild(opt);
+          });
+        }
+      } catch(e) {}
+    }
+
+    // 生图
+    async function generateImage() {
+      const prompt = document.getElementById("imagePrompt").value.trim();
+      const refFile = document.getElementById("imageRef").value;
+      if (!prompt) return;
+
+      const btn = document.getElementById("imageGenButton");
+      btn.disabled = true;
+      const msg = addChatMessage("user", "生图：" + prompt + (refFile ? " (参考事件截图)" : ""));
+      const replyMsg = addChatMessage("assistant", "");
+      const bubble = replyMsg.querySelector(".chat-bubble");
+      bubble.className = "chat-loading";
+      bubble.textContent = "生成中...";
+
+      try {
+        const refPath = refFile ? "static/vision_events/" + refFile : "";
+        const resp = await fetch("/api/chat/image/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: prompt,
+            model: refFile ? "hy-image-v3.0" : "hy-image-lite",
+            reference_image: refPath
+          })
+        });
+        const data = await resp.json();
+        if (data.ok && data.image_url) {
+          bubble.className = "chat-bubble";
+          bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
+        } else {
+          bubble.className = "chat-bubble";
+          bubble.textContent = "错误：" + (data.error || "生成失败");
+          replyMsg.className = "chat-message error";
+        }
+      } catch(e) {
+        bubble.className = "chat-bubble";
+        bubble.textContent = "网络错误：" + e.message;
+        replyMsg.className = "chat-message error";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById("imageGenButton").addEventListener("click", generateImage);
+    document.getElementById("imagePrompt").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") { e.preventDefault(); generateImage(); }
+    });
+
+    loadImageRefOptions();
     checkChatStatus();
   </script>
 </body>
