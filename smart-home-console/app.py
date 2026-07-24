@@ -910,11 +910,12 @@ async def api_llm_status():
 
 class ImageGenBody(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=1000, description="图片描述文本")
+    model: str = Field(default="hy-image-lite", description="模型: hy-image-lite / hy-image-v3.0")
 
 
 @app.post("/api/chat/image/generate", summary="AI 文生图")
 async def api_image_generate(body: ImageGenBody):
-    """用 HY-Image-3.0 根据文字描述生成图片。"""
+    """文生图。默认 hy-image-lite（同步快速，0.099元/张），可选 hy-image-v3.0（高质量，0.2元/张）。"""
     api_key = getattr(config, "HUNYUAN_IMAGE_API_KEY", "")
     if not api_key:
         return JSONResponse(
@@ -922,12 +923,13 @@ async def api_image_generate(body: ImageGenBody):
             content={"ok": False, "error": "未配置文生图 API Key"},
         )
 
+    model = body.model.strip()
     from hunyuan_image import HunyuanImageClient
 
     client = HunyuanImageClient(
         api_key=api_key,
         base_url=getattr(config, "HUNYUAN_IMAGE_BASE_URL", "https://tokenhub.tencentmaas.com/v1"),
-        model=getattr(config, "HUNYUAN_IMAGE_MODEL", "hy-image-v3.0"),
+        model=model,
     )
     result = client.generate(body.prompt)
 
