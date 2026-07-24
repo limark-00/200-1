@@ -83,6 +83,13 @@ def chat(
         sensor_text = f"\n\n当前实时传感器数据：\n{json.dumps(sensor_data, ensure_ascii=False, indent=2)}"
         system_msg += sensor_text
 
+    # 注入最近告警事件，方便 AI 回答截图相关问题
+    events = get_recent_events(10)
+    if events:
+        events_text = f"\n\n最近告警事件（最新10条）：\n{json.dumps(events, ensure_ascii=False, indent=2)}"
+        events_text += "\n截图存储在 static/vision_events/ 目录，可通过 /vision-events/{filename} 查看。"
+        system_msg += events_text
+
     messages = [{"role": "system", "content": system_msg}]
 
     # 添加历史对话
@@ -148,3 +155,32 @@ def get_current_sensor_data() -> dict[str, Any]:
     except Exception:
         pass
     return {}
+
+
+def get_recent_events(limit: int = 10) -> list[dict[str, Any]]:
+    """从 SQLite 读取最近告警事件摘要。"""
+    import sqlite3
+
+    db_path = getattr(config, "VISION_DB_PATH", "data/vision_events.db")
+    events = []
+    try:
+        conn = sqlite3.connect(db_path)
+        rows = conn.execute(
+            "SELECT id, started_at, ended_at, snapshot_filename, max_people, close_reason, acknowledged_at "
+            "FROM vision_events ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        conn.close()
+        for row in rows:
+            events.append({
+                "事件ID": row[0],
+                "开始时间": row[1],
+                "结束时间": row[2] or "进行中",
+                "截图文件": row[3],
+                "最多人数": row[4],
+                "结束原因": row[5] or "未知",
+                "已确认": "是" if row[6] else "否",
+            })
+    except Exception as e:
+        return [{"error": str(e)}]
+    return events
