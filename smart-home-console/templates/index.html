@@ -2732,7 +2732,6 @@
 
     async function loadImageRefOptions() {
       const sel = document.getElementById("imageRef");
-      // 添加上传选项
       const uplOpt = document.createElement("option");
       uplOpt.value = "__upload__";
       uplOpt.textContent = "📤 上传...";
@@ -2751,11 +2750,27 @@
       } catch(e) {}
     }
 
+    function _updateSendButton() {
+      const refFile = document.getElementById("imageRef").value;
+      const btn = document.getElementById("chatSendButton");
+      const input = document.getElementById("chatInput");
+      if (refFile || uploadedRefPath) {
+        btn.textContent = "生图";
+        btn.style.background = "#e67e22";
+        input.placeholder = "输入生图提示词...";
+      } else {
+        btn.textContent = "发送";
+        btn.style.background = "";
+        input.placeholder = "输入消息，例如：当前环境温度正常吗？";
+      }
+    }
+
     document.getElementById("imageRef").addEventListener("change", async function() {
       if (this.value === "__upload__") {
         this.value = "";
         document.getElementById("imageUpload").click();
       }
+      _updateSendButton();
     });
 
     document.getElementById("imageUpload").addEventListener("change", async (e) => {
@@ -2768,7 +2783,7 @@
         const data = await resp.json();
         if (data.ok) {
           uploadedRefPath = data.filepath;
-          alert("参考图已就绪，直接输入提示词点发送即可生图");
+          _updateSendButton();
         } else {
           alert("上传失败：" + (data.error || "未知错误"));
         }
@@ -2777,7 +2792,7 @@
       }
     });
 
-    // 修改发送逻辑：检测参考图 → 自动切换生图/对话
+    // 发送逻辑：按钮状态决定走对话还是生图
     const _origSend = sendChatMessage;
     sendChatMessage = async function() {
       const refFile = document.getElementById("imageRef").value;
@@ -2785,10 +2800,9 @@
       const prompt = document.getElementById("chatInput").value.trim();
 
       if (refPath) {
-        // 生图模式
         if (!prompt) return;
         document.getElementById("chatInput").value = "";
-        addChatMessage("user", "🎨 " + prompt);
+        addChatMessage("user", "🎨 生图:" + prompt);
         const replyMsg = addChatMessage("assistant", "");
         const bubble = replyMsg.querySelector(".chat-bubble");
         bubble.className = "chat-loading";
@@ -2817,6 +2831,7 @@
         }
         uploadedRefPath = "";
         document.getElementById("imageRef").value = "";
+        _updateSendButton();
       } else {
         _origSend();
       }
