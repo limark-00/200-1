@@ -2286,7 +2286,7 @@
     function reconnectVisionStream() {
       const stream = document.getElementById("visionStream");
       const separator = "/api/vision/stream/remote".includes("?") ? "&" : "?";
-      stream.src = `/api/vision/stream${separator}t=${Date.now()}`;
+      stream.src = `/api/vision/stream/remote${separator}t=${Date.now()}`;
       document.getElementById("visionStateText").textContent =
         "正在重连画面";
     }
