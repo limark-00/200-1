@@ -2774,14 +2774,15 @@
       const text = input.value.trim();
       const refPath = input.dataset.refPath || "";
 
-      if (text.startsWith("生图:") && refPath) {
+      if (text.startsWith("生图:")) {
         const prompt = text.replace(/^生图:\s*/, "");
         if (!prompt) return;
         input.value = "";
         input.dataset.refPath = "";
         document.getElementById("imageRef").value = "";
 
-        addChatMessage("user", "🎨 " + prompt);
+        const hasRef = !!refPath;
+        addChatMessage("user", "🎨 " + prompt + (hasRef ? " (参考图)" : ""));
         const replyMsg = addChatMessage("assistant", "");
         const bubble = replyMsg.querySelector(".chat-bubble");
         bubble.className = "chat-loading";
@@ -2789,7 +2790,11 @@
         try {
           const resp = await fetch("/api/chat/image/generate", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, model: "hy-image-v3.0", reference_image: refPath })
+            body: JSON.stringify({
+              prompt,
+              model: hasRef ? "hy-image-v3.0" : "hy-image-lite",
+              reference_image: refPath
+            })
           });
           const data = await resp.json();
           if (data.ok && data.image_url) {
