@@ -938,7 +938,7 @@
           <img
             id="visionStream"
             class="vision-frame"
-            src="/api/vision/stream"
+            src="/api/vision/stream/remote"
             alt="YOLO实时人员识别画面"
           />
           <canvas
@@ -2285,7 +2285,7 @@
 
     function reconnectVisionStream() {
       const stream = document.getElementById("visionStream");
-      const separator = "/api/vision/stream".includes("?") ? "&" : "?";
+      const separator = "/api/vision/stream/remote".includes("?") ? "&" : "?";
       stream.src = `/api/vision/stream${separator}t=${Date.now()}`;
       document.getElementById("visionStateText").textContent =
         "正在重连画面";
