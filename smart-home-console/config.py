@@ -77,10 +77,10 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "bemfa.com").strip()
 MQTT_PORT = int(os.getenv("MQTT_PORT", "9501"))
 
 # 混元大模型配置（OpenAI 兼容格式）
-# 获取 API Key: https://console.cloud.tencent.com/hunyuan/start
+# Hy3-preview: 输入 1.2元/百万tokens, 输出 4元/百万tokens, 免费100万tokens
 HUNYUAN_API_KEY = os.getenv("HUNYUAN_API_KEY", "").strip()
-HUNYUAN_BASE_URL = os.getenv("HUNYUAN_BASE_URL", "https://api.hunyuan.cloud.tencent.com/v1").strip()
-HUNYUAN_MODEL = os.getenv("HUNYUAN_MODEL", "hunyuan-turbos-latest").strip()
+HUNYUAN_BASE_URL = os.getenv("HUNYUAN_BASE_URL", "https://tokenhub-intl.tencentmaas.com/v1").strip()
+HUNYUAN_MODEL = os.getenv("HUNYUAN_MODEL", "hy3-preview").strip()
 HUNYUAN_VISION_MODEL = os.getenv("HUNYUAN_VISION_MODEL", "hunyuan-vision").strip()
 HUNYUAN_TEMPERATURE = float(os.getenv("HUNYUAN_TEMPERATURE", "0.7"))
 HUNYUAN_MAX_TOKENS = int(os.getenv("HUNYUAN_MAX_TOKENS", "2048"))
