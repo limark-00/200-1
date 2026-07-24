@@ -1,0 +1,934 @@
+/* =====================================================
+   camera.css
+   实验室视觉安全监控页面
+   ===================================================== */
+
+
+/* ===============================
+   页面整体
+================================ */
+
+.camera-page{
+
+    padding:30px;
+
+    background:#f7f9fc;
+
+    min-height:100vh;
+
+    box-sizing:border-box;
+
+    font-family:
+    "Microsoft YaHei",
+    Arial,
+    sans-serif;
+
+    color:#24364b;
+
+}
+
+
+
+/* ===============================
+   标题区域
+================================ */
+
+
+.camera-title{
+
+    font-size:28px;
+
+    font-weight:700;
+
+    margin-bottom:25px;
+
+}
+
+
+
+.camera-subtitle{
+
+    color:#78909c;
+
+    font-size:14px;
+
+    margin-top:-15px;
+
+    margin-bottom:25px;
+
+}
+
+
+
+
+
+
+/* =================================================
+   视频+状态区域
+================================================= */
+
+
+.camera-main{
+
+
+    display:flex;
+
+    gap:25px;
+
+
+    background:white;
+
+
+    border-radius:16px;
+
+
+    padding:20px;
+
+
+    border:1px solid #e5edf5;
+
+
+}
+
+
+
+
+
+
+/* 视频区域 */
+
+.video-box{
+
+
+    width:65%;
+
+
+}
+
+
+
+.video-box h2{
+
+
+    font-size:18px;
+
+
+    margin-bottom:15px;
+
+
+}
+
+
+
+.video-container{
+
+
+    position:relative;
+
+
+    width:100%;
+
+
+}
+
+
+
+
+.video-container img{
+
+
+    width:100%;
+
+
+    height:560px;
+
+
+    object-fit:cover;
+
+
+    border-radius:15px;
+
+
+    border:1px solid #dce6f0;
+
+
+}
+
+
+
+
+/* canvas危险区域覆盖 */
+
+
+#areaCanvas{
+
+
+    position:absolute;
+
+
+    left:0;
+
+
+    top:0;
+
+
+    width:100%;
+
+
+    height:100%;
+
+
+    pointer-events:none;
+
+
+}
+
+
+
+
+
+
+
+/* ===============================
+   状态信息
+================================ */
+
+
+
+.camera-info{
+
+
+    width:35%;
+
+
+}
+
+
+
+
+.camera-online{
+
+
+    display:flex;
+
+
+    justify-content:flex-end;
+
+
+    align-items:center;
+
+
+    gap:10px;
+
+
+    margin-bottom:25px;
+
+
+}
+
+
+
+.online-dot{
+
+
+    width:12px;
+
+    height:12px;
+
+
+    background:#40c98a;
+
+
+    border-radius:50%;
+
+
+}
+
+
+
+
+
+.restart-btn{
+
+
+    border:1px solid #ccd8e6;
+
+
+    background:white;
+
+
+    padding:8px 16px;
+
+
+    border-radius:8px;
+
+
+    cursor:pointer;
+
+
+}
+
+
+
+
+.restart-btn:hover{
+
+
+    background:#f2f6fa;
+
+
+}
+
+
+
+
+
+
+
+/* 人数大卡片 */
+
+
+.people-card{
+
+
+    background:
+
+    linear-gradient(
+    135deg,
+    #2475ad,
+    #368ac5
+    );
+
+
+    color:white;
+
+
+    padding:25px;
+
+
+    border-radius:15px;
+
+
+    margin-bottom:35px;
+
+
+}
+
+
+
+.people-title{
+
+
+    font-size:15px;
+
+
+    opacity:.9;
+
+
+}
+
+
+
+.people-number{
+
+
+    font-size:52px;
+
+
+    font-weight:bold;
+
+
+    margin-top:10px;
+
+
+}
+
+
+
+
+
+
+
+/* 状态列表 */
+
+
+.status-row{
+
+
+    display:flex;
+
+
+    justify-content:space-between;
+
+
+    padding:18px 0;
+
+
+    border-bottom:
+
+    1px solid #edf1f5;
+
+
+    font-size:16px;
+
+
+}
+
+
+
+.status-label{
+
+
+    color:#78909c;
+
+
+}
+
+
+
+.status-value{
+
+
+    font-weight:bold;
+
+
+}
+
+
+
+
+
+
+
+
+
+/* =================================================
+   下方区域
+================================================= */
+
+
+.camera-bottom{
+
+
+    display:flex;
+
+
+    gap:25px;
+
+
+    margin-top:25px;
+
+
+}
+
+
+
+
+
+/* ===============================
+危险区域卡片
+================================ */
+
+
+.area-card{
+
+
+    width:32%;
+
+
+    background:white;
+
+
+    border-radius:15px;
+
+
+    padding:25px;
+
+
+    border:1px solid #e3ebf5;
+
+
+}
+
+
+
+
+
+.card-header{
+
+
+    display:flex;
+
+
+    justify-content:space-between;
+
+
+    align-items:center;
+
+
+    margin-bottom:25px;
+
+
+}
+
+
+
+.card-header h2{
+
+
+    font-size:20px;
+
+
+    margin:0;
+
+
+}
+
+
+
+
+
+
+
+/* 已布防 */
+
+
+.deploy-tag{
+
+
+    background:#e7f8ef;
+
+
+    color:#26a269;
+
+
+    padding:6px 14px;
+
+
+    border-radius:20px;
+
+
+    font-size:14px;
+
+
+}
+
+
+
+
+
+
+
+.people-area{
+
+
+    display:flex;
+
+
+    justify-content:space-between;
+
+
+    align-items:center;
+
+
+    margin-bottom:20px;
+
+
+}
+
+
+
+.people-area span{
+
+
+    color:#78909c;
+
+
+    font-size:17px;
+
+
+}
+
+
+
+.people-area strong{
+
+
+    font-size:32px;
+
+
+}
+
+
+
+
+
+
+/* 无报警 */
+
+
+.no-alarm{
+
+
+    background:#eef3f8;
+
+
+    color:#78909c;
+
+
+    padding:18px;
+
+
+    border-radius:10px;
+
+
+    margin-bottom:20px;
+
+
+}
+
+
+
+
+
+
+/* 按钮区域 */
+
+
+.area-actions{
+
+
+    display:flex;
+
+
+    gap:10px;
+
+
+    margin-bottom:15px;
+
+
+}
+
+
+
+
+
+.area-actions button{
+
+
+    padding:9px 18px;
+
+
+    border-radius:8px;
+
+
+    cursor:pointer;
+
+
+    font-size:14px;
+
+
+    background:white;
+
+
+    border:1px solid #cbd8e8;
+
+
+}
+
+
+
+
+
+
+
+.edit-btn{
+
+
+    color:#34495e;
+
+
+}
+
+
+
+.save-btn{
+
+
+    background:#9bbfe0 !important;
+
+
+    color:white;
+
+
+    border:none!important;
+
+
+}
+
+
+
+
+
+.cancel-btn{
+
+
+    color:#95a5a6;
+
+
+}
+
+
+
+.delete-btn{
+
+
+    color:#e74c3c;
+
+
+    border-color:#f5b7b1!important;
+
+
+}
+
+
+
+
+
+
+
+
+.area-tip{
+
+
+    color:#78909c;
+
+
+    font-size:14px;
+
+
+    line-height:25px;
+
+
+}
+
+
+
+
+
+
+
+
+
+/* =================================================
+告警事件
+================================================= */
+
+
+.alarm-card{
+
+
+    width:68%;
+
+
+    background:white;
+
+
+    border-radius:15px;
+
+
+    padding:25px;
+
+
+    border:1px solid #e3ebf5;
+
+
+}
+
+
+
+.alarm-list{
+
+
+    max-height:500px;
+
+
+    overflow-y:auto;
+
+
+    padding-right:8px;
+
+
+}
+
+
+
+
+
+/* 单条事件 */
+
+
+.alarm-item{
+
+
+    border:1px solid #dce6f0;
+
+
+    border-radius:12px;
+
+
+    padding:18px;
+
+
+    margin-bottom:12px;
+
+
+}
+
+
+
+
+
+.alarm-head{
+
+
+    display:flex;
+
+
+    justify-content:space-between;
+
+
+    font-size:18px;
+
+
+    font-weight:bold;
+
+
+}
+
+
+
+.alarm-status{
+
+
+    color:#455a64;
+
+
+}
+
+
+
+
+
+.alarm-info{
+
+
+    display:grid;
+
+
+    grid-template-columns:1fr 1fr;
+
+
+    margin-top:15px;
+
+
+    color:#607d8b;
+
+
+    line-height:30px;
+
+
+}
+
+
+
+
+
+
+
+.alarm-link{
+
+
+    color:#1e88e5;
+
+
+    cursor:pointer;
+
+
+}
+
+
+
+
+
+
+
+
+/* 滚动条 */
+
+
+.alarm-list::-webkit-scrollbar{
+
+
+    width:8px;
+
+
+}
+
+
+
+.alarm-list::-webkit-scrollbar-thumb{
+
+
+    background:#cfd8dc;
+
+
+    border-radius:10px;
+
+
+}
+
+
+
+
+
+
+
+/* =================================================
+响应式
+================================================= */
+
+
+@media(max-width:1200px){
+
+
+.camera-main,
+
+
+.camera-bottom{
+
+
+    flex-direction:column;
+
+
+}
+
+
+
+.video-box,
+
+.camera-info,
+
+.area-card,
+
+.alarm-card{
+
+
+    width:100%;
+
+
+}
+
+
+
+}

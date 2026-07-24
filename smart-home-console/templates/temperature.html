@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>温度检测</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="detect-page">
+  <!-- 导航栏 -->
+  <nav class="detect-nav">
+    <a href="/" class="nav-home">首页</a>
+    <a href="/temperature.html" class="nav-link active">温度</a>
+    <a href="/humidity.html" class="nav-link">湿度</a>
+    <a href="/gas.html" class="nav-link">气体</a>
+    <a href="/light.html" class="nav-link">光照</a>
+    <a href="/camera.html" class="nav-link">摄像头</a>
+  </nav>
+  <!-- 四个数据卡片 -->
+  <div class="stat-row">
+    <div class="stat-card current"><div class="stat-label">当前值</div><div class="stat-value" id="current">--</div><div class="stat-unit">℃</div></div>
+    <div class="stat-card max"><div class="stat-label">最大值</div><div class="stat-value" id="max">--</div><div class="stat-unit">℃</div></div>
+    <div class="stat-card min"><div class="stat-label">最小值</div><div class="stat-value" id="min">--</div><div class="stat-unit">℃</div></div>
+    <div class="stat-card limit"><div class="stat-label">安全阈值</div><div class="stat-value" id="limit">28</div><div class="stat-unit">℃</div></div>
+  </div>
+  <!-- 报警按钮 -->
+  <div class="alarm-bar">
+    <div id="state" class="state-tag safe">安全</div>
+    <button class="btn-alarm" id="btnAlarm" onclick="triggerAlarm()" disabled>报警</button>
+    <button class="btn-stop" id="btnStop" onclick="stopAlarm()">停止</button>
+    <span class="buzzer-status" id="buzzerStatus">蜂鸣器: 未连接</span>
+  </div>
+  <!-- 折线图 -->
+  <div class="chart-box">
+    <h3>温度实时曲线</h3>
+    <canvas id="analysisChart"></canvas>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/analysis.js"></script>
+</body>
+</html>

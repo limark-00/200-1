@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>实验室视觉安全监控</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="cam-page">
+  <!-- 顶部标题栏 -->
+  <div class="cam-top">
+    <div class="cam-top-left">
+      <h1>YOLO视觉安全监控</h1>
+      <p class="cam-subtitle">罗技摄像头实时画面，仅识别person类别并显示检测框。</p>
+    </div>
+    <div class="cam-top-right">
+      <span class="cam-status-dot" id="statusDot"></span>
+      <span class="cam-status-text" id="statusText">连接中...</span>
+      <button class="btn-outline" id="reconnectBtn" onclick="reconnectCamera()">重连画面</button>
+    </div>
+  </div>
+  <!-- 主体区域 -->
+  <div class="cam-body">
+    <!-- 左侧视频 -->
+    <div class="cam-video-section">
+      <div class="cam-video-wrap">
+        <div class="cam-live-tag">LIVE · PERSON DETECTION</div>
+        <img id="cameraVideo" src="/camera" onerror="this.style.display='none'">
+        <canvas id="areaCanvas"></canvas>
+      </div>
+    </div>
+    <!-- 右侧状态 -->
+    <div class="cam-status-section">
+      <div class="cam-people-card">
+        <div class="cam-people-label">当前识别人数</div>
+        <div class="cam-people-num" id="people">0</div>
+      </div>
+      <div class="cam-info-list">
+        <div class="cam-info-row"><span>处理帧率</span><strong id="fps">0 FPS</strong></div>
+        <div class="cam-info-row"><span>YOLO模型</span><strong>yolo11n.pt</strong></div>
+        <div class="cam-info-row"><span>摄像头索引</span><strong id="cameraIndex">0</strong></div>
+      </div>
+    </div>
+  </div>
+  <!-- 底部区域 -->
+  <div class="cam-bottom">
+    <!-- 危险区域卡片 -->
+    <div class="cam-danger-card">
+      <div class="cam-card-header">
+        <h3>危险区域</h3>
+        <span class="cam-deploy-tag disarmed" id="deployTag">未布防</span>
+      </div>
+      <div class="cam-danger-body">
+        <div class="cam-danger-row" id="areaPeopleRow" style="display:none">
+          <span>区域内人数</span>
+          <strong id="areaPeople">0</strong>
+        </div>
+        <div class="cam-alarm-msg" id="alarmMsg">当前无活动告警</div>
+        <div class="cam-btn-row">
+          <button class="btn-cam" id="editBtn" onclick="startEdit()">编辑危险区域</button>
+          <button class="btn-cam btn-primary" id="saveBtn" onclick="saveArea()" style="display:none">保存</button>
+          <button class="btn-cam" id="cancelBtn" onclick="cancelEdit()" style="display:none">取消</button>
+          <button class="btn-cam btn-danger-outline" id="deleteBtn" onclick="deleteArea()">删除</button>
+          <button class="btn-cam btn-yellow" id="muteBtn">取消报警并禁音</button>
+        </div>
+        <div class="cam-hint" id="camHint">点击编辑后，在画面内拖拽绘制一个矩形。</div>
+      </div>
+    </div>
+    <!-- 告警事件记录 -->
+    <div class="cam-event-card">
+      <h3>告警事件记录</h3>
+      <div class="cam-event-list" id="eventList">
+        <div class="cam-event-empty">暂无告警事件</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 灯箱 -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightboxImg" src="">
+</div>
+<script src="/static/camera.js"></script>
+<script src="/static/camera_area.js"></script>
+</body>
+</html>
