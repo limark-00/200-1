@@ -788,19 +788,6 @@
       gap: 10px;
     }
 
-    #imageRefArea {
-      padding: 6px 0 0 0;
-    }
-
-    #imageRefArea select {
-      background: #1a1a2e;
-      color: #ccc;
-      border: 1px solid #444;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 13px;
-    }
-
     .chat-input {
       flex: 1;
       min-width: 0;
@@ -1240,12 +1227,8 @@
           maxlength="2000"
         />
         <button type="button" id="chatSendButton" class="chat-send-button">发送</button>
-        <button type="button" id="toggleImageMode" class="chat-send-button" style="background:#444; width:36px; font-size:18px;" title="切换到生图模式">🎨</button>
-        <button type="button" id="imageUploadBtn" style="display:none;" class="chat-send-button">+上传</button>
-      </div>
-      <div id="imageRefArea" style="display:none;">
-        <select id="imageRef" style="width:200px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:6px; margin:4px;">
-          <option value="">无参考图</option>
+        <select id="imageRef" style="background:#1a1a2e; color:#888; border:1px solid #444; border-radius:6px; padding:6px; font-size:12px; max-width:100px;">
+          <option value="">参考图</option>
         </select>
         <input type="file" id="imageUpload" accept="image/*" style="display:none" />
       </div>
@@ -2744,15 +2727,19 @@
       }
     });
 
-    // 生图模式切换
-    let imageMode = false;
+    // 参考图选择
     let uploadedRefPath = "";
 
     async function loadImageRefOptions() {
+      const sel = document.getElementById("imageRef");
+      // 添加上传选项
+      const uplOpt = document.createElement("option");
+      uplOpt.value = "__upload__";
+      uplOpt.textContent = "📤 上传...";
+      sel.appendChild(uplOpt);
       try {
         const resp = await fetch("/api/vision/events?limit=20");
         const data = await resp.json();
-        const sel = document.getElementById("imageRef");
         if (data.events) {
           data.events.forEach(ev => {
             const opt = document.createElement("option");
@@ -2764,35 +2751,13 @@
       } catch(e) {}
     }
 
-    document.getElementById("toggleImageMode").addEventListener("click", () => {
-      imageMode = !imageMode;
-      const btn = document.getElementById("toggleImageMode");
-      const input = document.getElementById("chatInput");
-      const sendBtn = document.getElementById("chatSendButton");
-      const refArea = document.getElementById("imageRefArea");
-      const uploadBtn = document.getElementById("imageUploadBtn");
-      if (imageMode) {
-        btn.style.background = "#e74c3c";
-        btn.title = "切回对话模式";
-        input.placeholder = "输入生图提示词，如：漫画风格监控画面";
-        sendBtn.textContent = "生图";
-        sendBtn.style.background = "#e67e22";
-        refArea.style.display = "block";
-        uploadBtn.style.display = "inline-block";
-      } else {
-        btn.style.background = "#444";
-        btn.title = "切换到生图模式";
-        input.placeholder = "输入消息，例如：当前环境温度正常吗？";
-        sendBtn.textContent = "发送";
-        sendBtn.style.background = "";
-        refArea.style.display = "none";
-        uploadBtn.style.display = "none";
+    document.getElementById("imageRef").addEventListener("change", async function() {
+      if (this.value === "__upload__") {
+        this.value = "";
+        document.getElementById("imageUpload").click();
       }
     });
 
-    document.getElementById("imageUploadBtn").addEventListener("click", () => {
-      document.getElementById("imageUpload").click();
-    });
     document.getElementById("imageUpload").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2803,8 +2768,7 @@
         const data = await resp.json();
         if (data.ok) {
           uploadedRefPath = data.filepath;
-          document.getElementById("imageUploadBtn").textContent = "已上传";
-          document.getElementById("imageUploadBtn").style.background = "#28a745";
+          alert("参考图已就绪，直接输入提示词点发送即可生图");
         } else {
           alert("上传失败：" + (data.error || "未知错误"));
         }
@@ -2813,52 +2777,52 @@
       }
     });
 
-    // 修改 sendChatMessage 支持生图模式
+    // 修改发送逻辑：检测参考图 → 自动切换生图/对话
     const _origSend = sendChatMessage;
     sendChatMessage = async function() {
-      if (!imageMode) return _origSend();
-      const prompt = document.getElementById("chatInput").value.trim();
       const refFile = document.getElementById("imageRef").value;
-      if (!prompt) return;
+      const refPath = uploadedRefPath || (refFile && refFile !== "__upload__" ? "static/vision_events/" + refFile : "");
+      const prompt = document.getElementById("chatInput").value.trim();
 
-      document.getElementById("chatInput").value = "";
-      const refPath = uploadedRefPath || (refFile ? "static/vision_events/" + refFile : "");
-      addChatMessage("user", "🎨 " + prompt + (refPath ? " (参考图)" : ""));
-      const replyMsg = addChatMessage("assistant", "");
-      const bubble = replyMsg.querySelector(".chat-bubble");
-      bubble.className = "chat-loading";
-      bubble.textContent = "生成中...";
+      if (refPath) {
+        // 生图模式
+        if (!prompt) return;
+        document.getElementById("chatInput").value = "";
+        addChatMessage("user", "🎨 " + prompt);
+        const replyMsg = addChatMessage("assistant", "");
+        const bubble = replyMsg.querySelector(".chat-bubble");
+        bubble.className = "chat-loading";
+        bubble.textContent = "生成中...";
 
-      try {
-        const resp = await fetch("/api/chat/image/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: prompt,
-            model: refPath ? "hy-image-v3.0" : "hy-image-lite",
-            reference_image: refPath
-          })
-        });
-        const data = await resp.json();
-        if (data.ok && data.image_url) {
+        try {
+          const resp = await fetch("/api/chat/image/generate", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: prompt, model: "hy-image-v3.0", reference_image: refPath
+            })
+          });
+          const data = await resp.json();
+          if (data.ok && data.image_url) {
+            bubble.className = "chat-bubble";
+            bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
+          } else {
+            bubble.className = "chat-bubble";
+            bubble.textContent = "错误：" + (data.error || "生成失败");
+            replyMsg.className = "chat-message error";
+          }
+        } catch(e) {
           bubble.className = "chat-bubble";
-          bubble.innerHTML = '<img src="' + data.image_url + '" style="max-width:100%; border-radius:8px;" alt="生成图片"/>';
-        } else {
-          bubble.className = "chat-bubble";
-          bubble.textContent = "错误：" + (data.error || "生成失败");
+          bubble.textContent = "网络错误：" + e.message;
           replyMsg.className = "chat-message error";
         }
-      } catch(e) {
-        bubble.className = "chat-bubble";
-        bubble.textContent = "网络错误：" + e.message;
-        replyMsg.className = "chat-message error";
+        uploadedRefPath = "";
+        document.getElementById("imageRef").value = "";
+      } else {
+        _origSend();
       }
-      uploadedRefPath = "";
-      document.getElementById("imageUploadBtn").textContent = "+上传";
-      document.getElementById("imageUploadBtn").style.background = "#333";
     };
 
-    // 重新绑定（因为发送按钮之前绑的是旧函数）
+    // 重新绑定发送按钮
     const sendBtn = document.getElementById("chatSendButton");
     const newBtn = sendBtn.cloneNode(true);
     sendBtn.parentNode.replaceChild(newBtn, sendBtn);
