@@ -2205,8 +2205,8 @@
       dot.className = "state-dot";
 
       if (!status.enabled) {
-        dot.classList.add("offline");
-        stateText.textContent = "视觉功能已关闭";
+        dot.classList.add("online");
+        stateText.textContent = "远程摄像头模式";
       } else if (
         status.running &&
         status.model_loaded &&

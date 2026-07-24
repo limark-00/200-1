@@ -13,7 +13,7 @@ async function getCameraInfo() {
     const dot = document.getElementById("statusDot");
     const txt = document.getElementById("statusText");
     if (dot) dot.className = "cam-status-dot" + (data.running ? " online" : "");
-    if (txt) txt.textContent = data.running ? "实时识别中" : (data.enabled ? "连接中..." : "离线");
+    if (txt) txt.textContent = data.running ? "实时识别中" : (data.enabled ? "连接中..." : "远程摄像头模式");
     // 总人数
     const peopleEl = document.getElementById("people");
     if (peopleEl) peopleEl.textContent = data.people_count;
