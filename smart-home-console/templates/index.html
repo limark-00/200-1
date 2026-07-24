@@ -788,6 +788,19 @@
       gap: 10px;
     }
 
+    #imageRefArea {
+      padding: 6px 0 0 0;
+    }
+
+    #imageRefArea select {
+      background: #1a1a2e;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
     .chat-input {
       flex: 1;
       min-width: 0;
@@ -1227,15 +1240,14 @@
           maxlength="2000"
         />
         <button type="button" id="chatSendButton" class="chat-send-button">发送</button>
+        <button type="button" id="toggleImageMode" class="chat-send-button" style="background:#444; width:36px; font-size:18px;" title="切换到生图模式">🎨</button>
+        <button type="button" id="imageUploadBtn" style="display:none;" class="chat-send-button">+上传</button>
       </div>
-      <div class="chat-input-area" style="border-top: 1px solid #333; padding-top: 8px;">
-        <input id="imagePrompt" class="chat-input" style="flex:1" type="text" placeholder="生图提示词，如：漫画风格的监控画面" maxlength="500" />
-        <select id="imageRef" style="width:180px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:8px; margin:0 4px;">
+      <div id="imageRefArea" style="display:none;">
+        <select id="imageRef" style="width:200px; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:6px; margin:4px;">
           <option value="">无参考图</option>
         </select>
         <input type="file" id="imageUpload" accept="image/*" style="display:none" />
-        <button type="button" id="imageUploadBtn" class="chat-send-button" style="white-space:nowrap; background:#333;">+上传</button>
-        <button type="button" id="imageGenButton" class="chat-send-button" style="white-space:nowrap;">生图</button>
       </div>
     </section>
   </main>
@@ -2732,7 +2744,10 @@
       }
     });
 
-    // 加载事件截图到下拉框
+    // 生图模式切换
+    let imageMode = false;
+    let uploadedRefPath = "";
+
     async function loadImageRefOptions() {
       try {
         const resp = await fetch("/api/vision/events?limit=20");
@@ -2742,15 +2757,39 @@
           data.events.forEach(ev => {
             const opt = document.createElement("option");
             opt.value = ev.snapshot_filename || "";
-            opt.textContent = "事件#" + ev.id + " " + (ev.snapshot_filename || "").substring(0, 30);
+            opt.textContent = "事件#" + ev.id;
             sel.appendChild(opt);
           });
         }
       } catch(e) {}
     }
 
-    // 上传参考图
-    let uploadedRefPath = "";
+    document.getElementById("toggleImageMode").addEventListener("click", () => {
+      imageMode = !imageMode;
+      const btn = document.getElementById("toggleImageMode");
+      const input = document.getElementById("chatInput");
+      const sendBtn = document.getElementById("chatSendButton");
+      const refArea = document.getElementById("imageRefArea");
+      const uploadBtn = document.getElementById("imageUploadBtn");
+      if (imageMode) {
+        btn.style.background = "#e74c3c";
+        btn.title = "切回对话模式";
+        input.placeholder = "输入生图提示词，如：漫画风格监控画面";
+        sendBtn.textContent = "生图";
+        sendBtn.style.background = "#e67e22";
+        refArea.style.display = "block";
+        uploadBtn.style.display = "inline-block";
+      } else {
+        btn.style.background = "#444";
+        btn.title = "切换到生图模式";
+        input.placeholder = "输入消息，例如：当前环境温度正常吗？";
+        sendBtn.textContent = "发送";
+        sendBtn.style.background = "";
+        refArea.style.display = "none";
+        uploadBtn.style.display = "none";
+      }
+    });
+
     document.getElementById("imageUploadBtn").addEventListener("click", () => {
       document.getElementById("imageUpload").click();
     });
@@ -2774,25 +2813,23 @@
       }
     });
 
-    // 生图
-    async function generateImage() {
-      const prompt = document.getElementById("imagePrompt").value.trim();
+    // 修改 sendChatMessage 支持生图模式
+    const _origSend = sendChatMessage;
+    sendChatMessage = async function() {
+      if (!imageMode) return _origSend();
+      const prompt = document.getElementById("chatInput").value.trim();
       const refFile = document.getElementById("imageRef").value;
       if (!prompt) return;
 
-      const btn = document.getElementById("imageGenButton");
-      btn.disabled = true;
-      let label = "生图：" + prompt;
-      if (uploadedRefPath) label += " (上传参考图)";
-      else if (refFile) label += " (事件截图)";
-      const msg = addChatMessage("user", label);
+      document.getElementById("chatInput").value = "";
+      const refPath = uploadedRefPath || (refFile ? "static/vision_events/" + refFile : "");
+      addChatMessage("user", "🎨 " + prompt + (refPath ? " (参考图)" : ""));
       const replyMsg = addChatMessage("assistant", "");
       const bubble = replyMsg.querySelector(".chat-bubble");
       bubble.className = "chat-loading";
       bubble.textContent = "生成中...";
 
       try {
-        const refPath = uploadedRefPath || (refFile ? "static/vision_events/" + refFile : "");
         const resp = await fetch("/api/chat/image/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2815,15 +2852,17 @@
         bubble.className = "chat-bubble";
         bubble.textContent = "网络错误：" + e.message;
         replyMsg.className = "chat-message error";
-      } finally {
-        btn.disabled = false;
       }
-    }
+      uploadedRefPath = "";
+      document.getElementById("imageUploadBtn").textContent = "+上传";
+      document.getElementById("imageUploadBtn").style.background = "#333";
+    };
 
-    document.getElementById("imageGenButton").addEventListener("click", generateImage);
-    document.getElementById("imagePrompt").addEventListener("keydown", function(e) {
-      if (e.key === "Enter") { e.preventDefault(); generateImage(); }
-    });
+    // 重新绑定（因为发送按钮之前绑的是旧函数）
+    const sendBtn = document.getElementById("chatSendButton");
+    const newBtn = sendBtn.cloneNode(true);
+    sendBtn.parentNode.replaceChild(newBtn, sendBtn);
+    newBtn.addEventListener("click", () => sendChatMessage());
 
     loadImageRefOptions();
     checkChatStatus();
