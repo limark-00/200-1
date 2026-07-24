@@ -490,6 +490,37 @@ async def index(request: Request):
 # 重点：第一个参数传 request，第二个传模板名，第三个传context
     return templates.TemplateResponse(request, "index.html", context=context_data)
 
+
+# 子页面路由
+@app.get("/temperature.html", response_class=HTMLResponse)
+async def temperature_page(request: Request):
+    return templates.TemplateResponse(request, "temperature.html", context={"topics": {"temp_hum": config.TEMP_HUM_TOPIC}})
+
+@app.get("/humidity.html", response_class=HTMLResponse)
+async def humidity_page(request: Request):
+    return templates.TemplateResponse(request, "humidity.html", context={"topics": {"temp_hum": config.TEMP_HUM_TOPIC}})
+
+@app.get("/gas.html", response_class=HTMLResponse)
+async def gas_page(request: Request):
+    return templates.TemplateResponse(request, "gas.html", context={"topics": {"gas": config.GAS_TOPIC}})
+
+@app.get("/light.html", response_class=HTMLResponse)
+async def light_page(request: Request):
+    return templates.TemplateResponse(request, "light.html", context={"topics": {"light": config.LIGHT_TOPIC}})
+
+@app.get("/camera.html", response_class=HTMLResponse)
+async def camera_page(request: Request):
+    return templates.TemplateResponse(request, "camera.html", context={})
+
+@app.get("/chart.html", response_class=HTMLResponse)
+async def chart_page(request: Request):
+    return templates.TemplateResponse(request, "chart.html", context={})
+
+@app.get("/profile.html", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    return templates.TemplateResponse(request, "profile.html", context={})
+
+
 # ==================== API（路径与原先 Flask 版保持一致，前端不用改）====================
 
 @app.get("/api/mode", summary="查询运行模式")
