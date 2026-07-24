@@ -41,8 +41,49 @@ CAPTURE_COOLDOWN = 10
 CAPTURE_DIR = "static/captures"
 CAPTURE_LIST_LIMIT = 20
 
+# YOLO视觉监控（Ubuntu主机 + 罗技USB摄像头）
+# 首阶段仅做人员检测与实时标注画面，不包含危险区域和NFC联动。
+VISION_ENABLED = os.getenv("VISION_ENABLED", "1").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+VISION_CAMERA_INDEX = int(os.getenv("VISION_CAMERA_INDEX", "0"))
+VISION_MODEL = os.getenv("VISION_MODEL", "yolo11n.pt").strip()
+VISION_CONFIDENCE = float(os.getenv("VISION_CONFIDENCE", "0.40"))
+VISION_IMAGE_SIZE = int(os.getenv("VISION_IMAGE_SIZE", "640"))
+VISION_FRAME_SKIP = max(1, int(os.getenv("VISION_FRAME_SKIP", "2")))
+VISION_FRAME_WIDTH = int(os.getenv("VISION_FRAME_WIDTH", "640"))
+VISION_FRAME_HEIGHT = int(os.getenv("VISION_FRAME_HEIGHT", "480"))
+VISION_JPEG_QUALITY = int(os.getenv("VISION_JPEG_QUALITY", "80"))
+VISION_RECONNECT_DELAY = float(os.getenv("VISION_RECONNECT_DELAY", "2.0"))
+VISION_DB_PATH = os.getenv(
+    "VISION_DB_PATH",
+    "data/vision_events.db",
+).strip()
+VISION_EVENT_DIR = os.getenv(
+    "VISION_EVENT_DIR",
+    "static/vision_events",
+).strip() or "static/vision_events"
+VISION_ENTER_SECONDS = float(os.getenv("VISION_ENTER_SECONDS", "2.0"))
+VISION_EXIT_SECONDS = float(os.getenv("VISION_EXIT_SECONDS", "3.0"))
+
 APP_HOST = "0.0.0.0"
 APP_PORT = 5001
+
+# 巴法云 MQTT 配置
+MQTT_BROKER = os.getenv("MQTT_BROKER", "bemfa.com").strip()
+MQTT_PORT = int(os.getenv("MQTT_PORT", "9501"))
+
+# 混元大模型配置（OpenAI 兼容格式）
+# 获取 API Key: https://console.cloud.tencent.com/hunyuan/start
+HUNYUAN_API_KEY = os.getenv("HUNYUAN_API_KEY", "").strip()
+HUNYUAN_BASE_URL = os.getenv("HUNYUAN_BASE_URL", "https://api.hunyuan.cloud.tencent.com/v1").strip()
+HUNYUAN_MODEL = os.getenv("HUNYUAN_MODEL", "hunyuan-turbos-latest").strip()
+HUNYUAN_VISION_MODEL = os.getenv("HUNYUAN_VISION_MODEL", "hunyuan-vision").strip()
+HUNYUAN_TEMPERATURE = float(os.getenv("HUNYUAN_TEMPERATURE", "0.7"))
+HUNYUAN_MAX_TOKENS = int(os.getenv("HUNYUAN_MAX_TOKENS", "2048"))
 
 # 保留旧项目兼容字段
 FLASK_HOST = APP_HOST
